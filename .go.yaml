@@ -1,0 +1,5 @@
+---
+path: github.com/mediocregopher/mediocre-api
+deps:
+    - loc: code.google.com/p/go-uuid/uuid
+    - loc: github.com/stretchr/testify
