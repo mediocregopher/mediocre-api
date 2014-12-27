@@ -1,5 +1,6 @@
-// Wraps around an http multiplexer (like http.ServeMux), providing automatic
-// rate-limiting and user authentication
+// Wraps around an http multiplexer (e.g. http.ServeMux), providing automatic
+// rate-limiting and user authentication. See the package README for more
+// documentation and examples
 package api
 
 import (
