@@ -1,9 +1,7 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	. "testing"
@@ -59,22 +57,4 @@ func TestAPI(t *T) {
 	assert.Equal(t, 200, w.Code)
 	assert.Equal(t, "bar\n", w.Body.String())
 
-}
-
-func TestRequestSignData(t *T) {
-	r, err := http.NewRequest("GET", "http://localhost/bar?this=that", bytes.NewBuffer([]byte("hi there")))
-	require.Nil(t, err)
-
-	b := requestSignData(r, false)
-	assert.Equal(t, "GEThttp://localhost/bar?this=that", string(b))
-
-	b = requestSignData(r, true)
-	assert.Equal(t, "GEThttp://localhost/bar?this=thathi there", string(b))
-
-	// Make sure that even after checking the POST data we can still read the
-	// body (requestSignData is supposed to re-buffer it and replace the
-	// original buffer)
-	body, err := ioutil.ReadAll(r.Body)
-	require.Nil(t, err)
-	assert.Equal(t, "hi there", string(body))
 }

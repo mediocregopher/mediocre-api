@@ -31,14 +31,3 @@ func TestSig(t *T) {
 		}
 	}
 }
-
-func TestSigOnly(t *T) {
-	datas := randByteSlices()
-	secrets := randByteSlices()
-	for i := range datas {
-		for j := range secrets {
-			sig := NewSigOnly(datas[i], secrets[j])
-			assert.Equal(t, true, VerifySigOnly(sig, datas[i], secrets[j]))
-		}
-	}
-}

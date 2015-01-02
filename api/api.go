@@ -4,10 +4,7 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/mediocregopher/mediocre-api/api/apitok"
@@ -21,7 +18,7 @@ var (
 	APITokenInvalid     = "api token invalid"
 	APITokenRateLimited = "chill bro..."
 	IPAddrRateLimited   = "chill bro...."
-	UserTokenSigInvalid = "user token or signature invalid"
+	UserTokenInvalid    = "user token or invalid"
 	SecretNotSet        = "secret not set on server"
 	UnknownProblem      = "unknown problem"
 )
@@ -58,10 +55,6 @@ const (
 
 	// Sets the endpoint as requiring a valid user in order to be used
 	RequireUserAuth
-
-	// Sets the endpoint as not including the POST body when checking the user
-	// signature
-	UserAuthIgnoreBody
 )
 
 type handlerOpt struct {
@@ -105,28 +98,32 @@ func (a *API) NewAPIToken() string {
 
 // Returns the api token as sent by the client. Will return empty string if the
 // client has not set one
-func GetAPIToken(r *http.Request) string {
+func (a *API) GetAPIToken(r *http.Request) string {
 	return r.Header.Get("X-API-TOKEN")
 }
 
-// Generates new user token and secret for the given user identifier (which can
-// later be retrieved from the token using GetUser). Will return empty strings
-// if Secret isn't set
-func (a *API) NewUserTokenSecret(user string) (string, string) {
+// Generates new user token for the given user identifier (which can later be
+// retrieved from the token using GetUser). Will return empty string if Secret
+// isn't set
+func (a *API) NewUserToken(user string) string {
 	if a.Secret == nil {
-		return "", ""
+		return ""
 	}
 	return usertok.New(user, a.Secret)
 }
 
 // Returns the user identifier held by the user token from the given request.
-// Returns empty string if the user token header isn't set or invalid
-func GetUser(r *http.Request) string {
+// Returns empty string if the user token header isn't set or invalid, or if
+// Secret isn't set
+func (a *API) GetUser(r *http.Request) string {
+	if a.Secret == nil {
+		return ""
+	}
 	userTok := r.Header.Get("X-USER-TOKEN")
 	if userTok == "" {
 		return ""
 	}
-	return usertok.ExtractUser(userTok)
+	return usertok.ExtractUser(userTok, a.Secret)
 }
 
 func (a *API) getHandlerOpt(pattern string) *handlerOpt {
@@ -169,7 +166,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// We only rate limit by api token if we aren't rate limiting by ip
 	} else if o.flags&NoAPITokenRequired == 0 && a.Secret != nil {
-		token := GetAPIToken(r)
+		token := a.GetAPIToken(r)
 		if token == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, APITokenMissing)
@@ -201,44 +198,18 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		userTok := r.Header.Get("X-User-Token")
-		userSig := r.Header.Get("X-User-Signature")
-		if userTok == "" || userSig == "" {
+		if userTok == "" {
 			w.WriteHeader(400)
-			fmt.Fprintf(w, UserTokenSigInvalid)
+			fmt.Fprintf(w, UserTokenInvalid)
 			return
 		}
 
-		includePost := o.flags&UserAuthIgnoreBody == 0
-		data := requestSignData(r, includePost)
-		if !usertok.Verify(userTok, userSig, data, a.Secret) {
+		if usertok.ExtractUser(userTok, a.Secret) == "" {
 			w.WriteHeader(400)
-			fmt.Fprintf(w, UserTokenSigInvalid)
+			fmt.Fprintf(w, UserTokenInvalid)
 			return
 		}
 	}
 
 	handler.ServeHTTP(w, r)
-}
-
-func requestSignData(r *http.Request, includePost bool) []byte {
-	if includePost && r.ContentLength < 0 {
-		return nil
-	}
-
-	b := make([]byte, 0, r.ContentLength+64)
-	b = append(b, r.Method...)
-	b = append(b, r.URL.String()...)
-
-	if includePost {
-		buf := bytes.NewBuffer(make([]byte, 0, r.ContentLength))
-		tee := io.TeeReader(r.Body, buf)
-		body, err := ioutil.ReadAll(tee)
-		if err != nil {
-			return nil
-		}
-		b = append(b, body...)
-		r.Body = ioutil.NopCloser(buf)
-	}
-
-	return b
 }

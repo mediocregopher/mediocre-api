@@ -11,18 +11,12 @@ import (
 // Returns a string which is a combination of the given data and a signature of
 // the given data, signed by the given secret
 func New(data, secret []byte) string {
-	sum64 := NewSigOnly(data, secret)
-	data64 := base64.StdEncoding.EncodeToString(data)
-	return data64 + ":" + sum64
-}
-
-// Returns the signature of the data, without the data itself prepended on like
-// New() does. This cannot be passed into Extract() or Verify()
-func NewSigOnly(data, secret []byte) string {
 	h := hmac.New(sha1.New, secret)
 	h.Write(data)
 	sum := h.Sum(nil)
-	return base64.StdEncoding.EncodeToString(sum)
+	sum64 := base64.StdEncoding.EncodeToString(sum)
+	data64 := base64.StdEncoding.EncodeToString(data)
+	return data64 + ":" + sum64
 }
 
 // Extracts the encoded, signed data in the given sig. Returns nil if the data
@@ -57,15 +51,4 @@ func Extract(sig string, secret []byte) []byte {
 // Shortcut for Extract(sig, secret) != nil
 func Verify(sig string, secret []byte) bool {
 	return Extract(sig, secret) != nil
-}
-
-// Returns whether or not the given signature (returned from NewSigOnly, or
-// base64 encoded by something else) was used to sign data using secret
-func VerifySigOnly(sig string, data, secret []byte) bool {
-	h := hmac.New(sha1.New, secret)
-	h.Write(data)
-	sum := h.Sum(nil)
-
-	sigD, _ := base64.StdEncoding.DecodeString(sig)
-	return hmac.Equal(sum, sigD)
 }

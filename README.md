@@ -4,7 +4,7 @@ A simple wrapper around go's standard `net/http` package. It provides:
 
 * Rate-limiting based on an api token (or optionally on an ip address)
 
-* User authentication and request signing
+* User authentication
 
 * Interoperability with other packages besides `net/http`. See the Muxer
   interface definition
@@ -54,20 +54,18 @@ func main() {
 		fmt.Fprintln(w, msg)
 	})
 
-	// In order to use user authenticated endpoints the user must retrieve a
-	// user token and user secret, and use the secret to sign their requests.
-	// The following lets a user login and retrieve their tokens
+    // In order to use user authenticated endpoints the user must retrieve a
+    // user token, and use that to authenticate their requests. The following
+    // lets a user login and retrieve their token
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		username := r.FormValue("username")
-		userTok, userSecret := a.NewUserTokenSecret(username)
+		userTok := a.NewUserToken(username)
 		fmt.Fprintln(w, userTok)
-		fmt.Fprintln(w, userSecret)
 	})
 
-	// This endpoint is only available to users who have logged in and properly
-	// send their user token (through X-USER-TOKEN) and a request signature
-	// (through X-USER-SIGNATURE). It retrieves their username that thay're
-	// logged in as and welcomes them to the site
+    // This endpoint is only available to users who have logged in and properly
+    // send their user token (through X-USER-TOKEN). It retrieves their username
+    // that thay're logged in as and welcomes them to the site
 	welcomeEndpt := "/welcome"
 	a.SetHandlerFlags(welcomeEndpt, api.RequireUserAuth)
 	mux.HandleFunc(welcomeEndpt, func(w http.ResponseWriter, r *http.Request) {
@@ -103,47 +101,8 @@ Any modifications to rate limiting fields must be done before the call to
 
 ## User authentication
 
-User authentication is based upon a token and a secret, both of which are
-retrieved through the api during a login. The user token is sent with every
-request which is user authenticated, but the secret is never ever ever sent to
-the server or outside the client at all.
-
-To make a user authenticated request two additional headers (besides the
-`X-API-TOKEN`) must be set: `X-USER-TOKEN` and `X-USER-SIGNATURE`.
-`X-USER-TOKEN` is simple the token as returned by the login call. The signature
-is generated as follows:
-
-the HMAC-SHA1 of the following (all concatonated, with no
-separator): The request type (e.g. POST, GET), the request URL (with hostname,
-port, and GET parameters included), and the POST data (or empty string if there
-is none). The secret returned by the sign-in request should be used as the
-secret for the HMAC-SHA1. The result should be base64 encoded.
-
-### User authentication example
-
-Let's say the user signed in and they received back a user token of `abcdef` and
-a secret of `012345`. They are trying to make a POST request to:
-
-    http://localhost/api/whatever?doicare=no&howboutnow=nope
-
-with POST data of
-
-    this beat is bananas
-
-The signature would be computed as:
-
-    // hmac-sha1(<secret>, <data>)
-    hmac-sha1(`012345`, 'POSThttp://localhost/api/whatever?doicare=no&howboutnow=nopethis beat is bananas')
-    // zoDwmDig84OWyrQB95JJHmw5Oos=
-
-And the full request would look like:
-
-    POST /api/whatever?doicare=no&howboutnow=nope HTTP/1.1
-    Host: localhost
-    Accept: */*
-    Content-Length: 20
-    X-API-TOKEN: sometoken
-    X-USER-TOKEN: abcdef
-    X-USER-SIGNATURE: zoDwmDig84OWyrQB95JJHmw5Oos=
-
-    this beat is bananas
+User authentication is based upon a simple user token system. A client retrieves
+a user token from the api, which authenticates the user however it wants and
+returns a token generated through `NewUserToken`. This token must be included
+with any requests that require user authentication as the `X-USER-TOKEN` header.
+The api may retrieve the authenticated user identifier using `GetUser`.
