@@ -18,7 +18,8 @@ var (
 	APITokenInvalid     = "api token invalid"
 	APITokenRateLimited = "chill bro..."
 	IPAddrRateLimited   = "chill bro...."
-	UserTokenInvalid    = "user token or invalid"
+	UserTokenMissing    = "user token missing"
+	UserTokenInvalid    = "user token invalid"
 	SecretNotSet        = "secret not set on server"
 	UnknownProblem      = "unknown problem"
 )
@@ -216,13 +217,13 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		userTok := r.Header.Get("X-User-Token")
 		if userTok == "" {
 			w.WriteHeader(400)
-			fmt.Fprintf(w, UserTokenInvalid)
+			fmt.Fprintln(w, UserTokenMissing)
 			return
 		}
 
 		if usertok.ExtractUser(userTok, a.Secret) == "" {
 			w.WriteHeader(400)
-			fmt.Fprintf(w, UserTokenInvalid)
+			fmt.Fprintln(w, UserTokenInvalid)
 			return
 		}
 	}

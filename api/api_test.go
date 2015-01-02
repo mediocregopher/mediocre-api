@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAPI(t *T) {
+var testAPI, testMux = func() (*API, *http.ServeMux) {
 	secret := []byte("wubalubadubdub!")
 	s := http.NewServeMux()
 	a := NewAPI(s)
@@ -34,65 +34,63 @@ func TestAPI(t *T) {
 		}
 	})
 
-	r, err := http.NewRequest("GET", "/foo", nil)
+	return a, s
+}()
+
+func req(t *T, method, endpnt, apiTok, userTok string) (int, string) {
+	r, err := http.NewRequest(method, endpnt, nil)
 	require.Nil(t, err)
+	if apiTok != "" {
+		r.Header.Set("X-API-TOKEN", apiTok)
+	}
+	if userTok != "" {
+		r.Header.Set("X-USER-TOKEN", userTok)
+	}
 	w := httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 200, w.Code)
-	assert.Equal(t, "foo\n", w.Body.String())
+	testAPI.ServeHTTP(w, r)
+	return w.Code, w.Body.String()
+}
 
-	r, err = http.NewRequest("GET", "/bar", nil)
-	require.Nil(t, err)
-	w = httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 400, w.Code)
-	assert.Equal(t, APITokenMissing+"\n", w.Body.String())
+func TestNoAPIToken(t *T) {
+	code, body := req(t, "GET", "/foo", "", "")
+	assert.Equal(t, 200, code)
+	assert.Equal(t, "foo\n", body)
+}
 
-	r, err = http.NewRequest("GET", "/bar", nil)
-	require.Nil(t, err)
-	r.Header.Set("X-API-TOKEN", "something awful")
-	w = httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 400, w.Code)
-	assert.Equal(t, APITokenInvalid+"\n", w.Body.String())
+func TestAPIToken(t *T) {
+	apiTok := testAPI.NewAPIToken()
 
-	tok := a.NewAPIToken()
+	code, body := req(t, "GET", "/bar", "", "")
+	assert.Equal(t, 400, code)
+	assert.Equal(t, APITokenMissing+"\n", body)
 
-	r, err = http.NewRequest("GET", "/bar", nil)
-	require.Nil(t, err)
-	r.Header.Set("X-API-TOKEN", tok)
-	w = httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 200, w.Code)
-	assert.Equal(t, "bar\n", w.Body.String())
+	code, body = req(t, "GET", "/bar", "blah blah blah", "")
+	assert.Equal(t, 400, code)
+	assert.Equal(t, APITokenInvalid+"\n", body)
 
-	// Test an endpoint which requires user auth for only POST requests
-	r, err = http.NewRequest("GET", "/baz", nil)
-	require.Nil(t, err)
-	r.Header.Set("X-API-TOKEN", tok)
-	w = httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 200, w.Code)
-	assert.Equal(t, "baz\n", w.Body.String())
+	code, body = req(t, "GET", "/bar", apiTok, "")
+	assert.Equal(t, 200, code)
+	assert.Equal(t, "bar\n", body)
+}
 
-	r, err = http.NewRequest("POST", "/baz", nil)
-	require.Nil(t, err)
-	r.Header.Set("X-API-TOKEN", tok)
-	w = httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 400, w.Code)
-	assert.Equal(t, UserTokenInvalid, w.Body.String())
-
+func TestUserToken(t *T) {
 	username := "morty"
-	userTok := a.NewUserToken(username)
+	apiTok := testAPI.NewAPIToken()
+	userTok := testAPI.NewUserToken(username)
 
-	r, err = http.NewRequest("POST", "/baz", nil)
-	require.Nil(t, err)
-	r.Header.Set("X-API-TOKEN", tok)
-	r.Header.Set("X-USER-TOKEN", userTok)
-	w = httptest.NewRecorder()
-	a.ServeHTTP(w, r)
-	assert.Equal(t, 200, w.Code)
-	assert.Equal(t, username+"\n", w.Body.String())
+	code, body := req(t, "GET", "/baz", apiTok, "")
+	assert.Equal(t, 200, code)
+	assert.Equal(t, "baz\n", body)
 
+	code, body = req(t, "POST", "/baz", apiTok, "")
+	assert.Equal(t, 400, code)
+	assert.Equal(t, UserTokenMissing+"\n", body)
+
+	code, body = req(t, "POST", "/baz", apiTok, "blah blah blah")
+	assert.Equal(t, 400, code)
+	assert.Equal(t, UserTokenInvalid+"\n", body)
+
+	code, body = req(t, "POST", "/baz", apiTok, userTok)
+	assert.Equal(t, 200, code)
+	assert.Equal(t, username+"\n", body)
 }
