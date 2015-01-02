@@ -67,7 +67,7 @@ func main() {
     // send their user token (through X-USER-TOKEN). It retrieves their username
     // that thay're logged in as and welcomes them to the site
 	welcomeEndpt := "/welcome"
-	a.SetHandlerFlags(welcomeEndpt, api.RequireUserAuth)
+	a.SetHandlerFlags(welcomeEndpt, api.RequireUserAuthAlways)
 	mux.HandleFunc(welcomeEndpt, func(w http.ResponseWriter, r *http.Request) {
 		username := api.GetUser(r)
 		fmt.Fprintf(w, "Welcome to the site, %s!", username)

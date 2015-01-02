@@ -53,8 +53,24 @@ const (
 	// token rate limiting will not be used on the endpoint either
 	NoAPITokenRequired
 
-	// Sets the endpoint as requiring a valid user in order to be used
-	RequireUserAuth
+	// Sets the endpoint as requiring a valid user token for GET requests
+	RequireUserAuthGet
+
+	// Sets the endpoint as requiring a valid user token for POST requests
+	RequireUserAuthPost
+
+	// Sets the endpoint as requiring a valid user token for PUT requests
+	RequireUserAuthPut
+
+	// Sets the endpoint as requiring a valid user token for HEAD requests
+	RequireUserAuthHead
+
+	// Sets the endpoint as requiring a valid user token for DELETE requests
+	RequireUserAuthDelete
+)
+
+const (
+	RequireUserAuthAlways = RequireUserAuthGet | RequireUserAuthPost | RequireUserAuthPut | RequireUserAuthHead | RequireUserAuthDelete
 )
 
 type handlerOpt struct {
@@ -190,7 +206,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if o.flags&RequireUserAuth != 0 {
+	if a.requiresUserAuth(r, o.flags) {
 		if a.Secret == nil {
 			w.WriteHeader(500)
 			fmt.Fprintf(w, SecretNotSet)
@@ -212,4 +228,27 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.ServeHTTP(w, r)
+}
+
+func (a *API) requiresUserAuth(r *http.Request, flags HandlerFlag) bool {
+	if flags & RequireUserAuthAlways == RequireUserAuthAlways {
+		return true
+	}
+	var checkFlag HandlerFlag
+	switch r.Method {
+	case "GET":
+		checkFlag = RequireUserAuthGet
+	case "POST":
+		checkFlag = RequireUserAuthPost
+	case "PUT":
+		checkFlag = RequireUserAuthPut
+	case "HEAD":
+		checkFlag = RequireUserAuthHead
+	case "DELETE":
+		checkFlag = RequireUserAuthDelete
+	default:
+		return false
+	}
+
+	return flags & checkFlag != 0
 }
