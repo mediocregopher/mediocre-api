@@ -2,7 +2,9 @@
 
 A simple wrapper around go's standard `net/http` package. It provides:
 
-* Rate-limiting based on an api token (or optionally on an ip address)
+* Rate-limiting based on an api token (or optionally on an ip address). Rate
+  limiting is based on actual time to complete requests, not just number of
+  requests
 
 * User authentication
 
@@ -87,7 +89,7 @@ retrieved from the api itself.
 
 ### Rate-Limiting
 
-Rate limiting is based on a token bucket system. You can read more about it in
+Rate limiting is based on a time bucket system. You can read more about it in
 the apitok package docs. Parameters for rate-limiting on the api can be set by
 modifying the `RateLimiter`'s fields on the `API` struct returned from
 `NewAPI`.

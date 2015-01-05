@@ -6,6 +6,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/mediocregopher/mediocre-api/api/apitok"
 	"github.com/mediocregopher/mediocre-api/api/usertok"
@@ -167,10 +168,15 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		o = &blankHandlerOpt
 	}
 
+	// This could be the X-API-TOKEN or the IP, depending a flag in handlerOpts.
+	// If it's left empty we won't bother calling Use on it at the end of the
+	// query
+	var token string
+
 	if o.flags&IPRateLimited != 0 {
-		switch a.RateLimiter.UseRaw(r.RemoteAddr) {
+		switch a.RateLimiter.CanUseRaw(r.RemoteAddr) {
 		case apitok.Success:
-			// COntinue on with life
+			token = r.RemoteAddr
 		case apitok.RateLimited:
 			w.WriteHeader(420)
 			fmt.Fprintln(w, IPAddrRateLimited)
@@ -183,16 +189,16 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// We only rate limit by api token if we aren't rate limiting by ip
 	} else if o.flags&NoAPITokenRequired == 0 && a.Secret != nil {
-		token := a.GetAPIToken(r)
-		if token == "" {
+		apiToken := a.GetAPIToken(r)
+		if apiToken == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, APITokenMissing)
 			return
 		}
-		switch a.RateLimiter.Use(token, a.Secret) {
+		switch a.RateLimiter.CanUse(apiToken, a.Secret) {
 		case apitok.Success:
-			// Continue on with life
-		case apitok.TokenInvalid, apitok.TokenExpired:
+			token = apiToken
+		case apitok.TokenInvalid:
 			w.WriteHeader(400)
 			fmt.Fprintln(w, APITokenInvalid)
 			return
@@ -228,11 +234,17 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	start := time.Now()
 	handler.ServeHTTP(w, r)
+
+	if token != "" {
+		elapsed := time.Since(start)
+		a.RateLimiter.Use(token, elapsed)
+	}
 }
 
 func (a *API) requiresUserAuth(r *http.Request, flags HandlerFlag) bool {
-	if flags & RequireUserAuthAlways == RequireUserAuthAlways {
+	if flags&RequireUserAuthAlways == RequireUserAuthAlways {
 		return true
 	}
 	var checkFlag HandlerFlag
@@ -251,5 +263,5 @@ func (a *API) requiresUserAuth(r *http.Request, flags HandlerFlag) bool {
 		return false
 	}
 
-	return flags & checkFlag != 0
+	return flags&checkFlag != 0
 }

@@ -23,6 +23,10 @@ type RateLimitStore interface {
 	// to be 0 if it didn't previously exist
 	DecrBy(key string, amount, min int64) (int64, bool)
 
+	// Retrieve the value of the given key. The key should be assumed to be 0 if
+	// it didn't previously exists
+	Get(key string) int64
+
 	// The time the key was last modified. Returns the zero time if the key did
 	// not previously exist
 	LastModified(key string) time.Time
@@ -84,6 +88,13 @@ func (m *RateLimitMem) DecrBy(key string, amount, min int64) (int64, bool) {
 		tsMod: time.Now(),
 	}
 	return newAmount, mind
+}
+
+// Implementation of Get for RateLimitStore
+func (m *RateLimitMem) Get(key string) int64 {
+	m.l.Lock()
+	defer m.l.Unlock()
+	return m.m[key].val
 }
 
 // Implementation of LastModified for RateLimitStore
