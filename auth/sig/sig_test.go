@@ -10,7 +10,7 @@ import (
 // Returns 10 random slices of bytes
 func randByteSlices() [][]byte {
 	slices := make([][]byte, 0, 10)
-	for _ = range slices {
+	for range slices {
 		b := make([]byte, 50)
 		if _, err := rand.Read(b); err != nil {
 			panic(err)

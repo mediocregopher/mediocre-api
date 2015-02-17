@@ -1,6 +1,6 @@
-// Wraps around an http multiplexer (e.g. http.ServeMux), providing automatic
-// rate-limiting and user authentication. See the package README for more
-// documentation and examples
+// Package auth wraps around an http multiplexer (e.g. http.ServeMux), providing
+// automatic rate-limiting and user authentication. See the package README for
+// more documentation and examples
 package auth
 
 import (
@@ -43,35 +43,43 @@ type Muxer interface {
 	Handler(*http.Request) (http.Handler, string)
 }
 
+// HandlerFlag is used to set options on a particular handler (see
+// SetHandlerFlags)
 type HandlerFlag int
 
 const (
-	// Sets the endpoint as being rate-limited by IP instead of by api token.
-	// Should be used sparingly (preferably only on the endpoint which doles out
-	// the api tokens)
+	// IPRateLimited sets the endpoint as being rate-limited by IP instead of by
+	// api token.  Should be used sparingly (preferably only on the endpoint
+	// which doles out the api tokens)
 	IPRateLimited HandlerFlag = 1 << iota
 
-	// Sets the endpoint as not requiring an api token to be used. Obviously api
-	// token rate limiting will not be used on the endpoint either
+	// NoAPITokenRequired sets the endpoint as not requiring an api token to be
+	// used. Obviously api token rate limiting will not be used on the endpoint
+	// either
 	NoAPITokenRequired
 
-	// Sets the endpoint as requiring a valid user token for GET requests
+	// RequireUserAuthGet sets the endpoint as requiring a valid user token for
+	// GET requests
 	RequireUserAuthGet
 
-	// Sets the endpoint as requiring a valid user token for POST requests
+	// RequireUserAuthPost sets the endpoint as requiring a valid user token for
+	// POST requests
 	RequireUserAuthPost
 
-	// Sets the endpoint as requiring a valid user token for PUT requests
+	// RequireUserAuthPut sets the endpoint as requiring a valid user token for
+	// PUT requests
 	RequireUserAuthPut
 
-	// Sets the endpoint as requiring a valid user token for HEAD requests
+	// RequireUserAuthHead sets the endpoint as requiring a valid user token for
+	// HEAD requests
 	RequireUserAuthHead
 
-	// Sets the endpoint as requiring a valid user token for DELETE requests
+	// RequireUserAuthDelete sets the endpoint as requiring a valid user token
+	// for DELETE requests
 	RequireUserAuthDelete
-)
 
-const (
+	// RequireUserAuthAlways sets the endpoint as requiring a valid user token
+	// no matter what the request type is
 	RequireUserAuthAlways = RequireUserAuthGet | RequireUserAuthPost | RequireUserAuthPut | RequireUserAuthHead | RequireUserAuthDelete
 )
 
@@ -81,8 +89,8 @@ type handlerOpt struct {
 
 var blankHandlerOpt handlerOpt
 
-// An http.Handler which wraps a given Muxer, providing automatic rate-limiting
-// and user authentication
+// API is an http.Handler which wraps a given Muxer, providing automatic
+// rate-limiting and user authentication
 type API struct {
 	mux         Muxer
 	handlerOpts map[string]*handlerOpt
@@ -97,6 +105,7 @@ type API struct {
 	Secret []byte
 }
 
+// NewAPI takes in a Muxer and returns an API which wraps around it
 func NewAPI(mux Muxer) *API {
 	return &API{
 		mux:         mux,
@@ -105,8 +114,8 @@ func NewAPI(mux Muxer) *API {
 	}
 }
 
-// Generates a new api token which will work with the secret this API is using.
-// Will return empty string if Secret isn't set
+// NewAPIToken generates a new api token which will work with the secret this
+// API is using.  Will return empty string if Secret isn't set
 func (a *API) NewAPIToken() string {
 	if a.Secret == nil {
 		return ""
@@ -114,15 +123,15 @@ func (a *API) NewAPIToken() string {
 	return apitok.New(a.Secret)
 }
 
-// Returns the api token as sent by the client. Will return empty string if the
-// client has not set one
+// GetAPIToken returns the api token as sent by the client. Will return empty
+// string if the client has not set one
 func (a *API) GetAPIToken(r *http.Request) string {
 	return r.Header.Get("X-API-TOKEN")
 }
 
-// Generates new user token for the given user identifier (which can later be
-// retrieved from the token using GetUser). Will return empty string if Secret
-// isn't set
+// NewUserToken generates a new user token for the given user identifier (which
+// can later be retrieved from the token using GetUser). Will return empty
+// string if Secret isn't set
 func (a *API) NewUserToken(user string) string {
 	if a.Secret == nil {
 		return ""
@@ -130,9 +139,9 @@ func (a *API) NewUserToken(user string) string {
 	return usertok.New(user, a.Secret)
 }
 
-// Returns the user identifier held by the user token from the given request.
-// Returns empty string if the user token header isn't set or invalid, or if
-// Secret isn't set
+// GetUser returns the user identifier held by the user token from the given
+// request. Returns empty string if the user token header isn't set or invalid,
+// or if Secret isn't set
 func (a *API) GetUser(r *http.Request) string {
 	if a.Secret == nil {
 		return ""
@@ -151,7 +160,7 @@ func (a *API) getHandlerOpt(pattern string) *handlerOpt {
 	return a.handlerOpts[pattern]
 }
 
-// Sets option flags on the given endpoint pattern
+// SetHandlerFlags sets option flags on the given endpoint pattern
 func (a *API) SetHandlerFlags(pattern string, flags HandlerFlag) {
 	o := a.getHandlerOpt(pattern)
 	o.flags = flags

@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Storage used to store data needed for rate limiting. All methods must be
-// thread-safe with each other
+// RateLimitStore is used to store data needed for rate limiting. All methods
+// must be thread-safe with each other
 type RateLimitStore interface {
 
 	// Increments the given key by the given amount, and returns the value of
@@ -41,20 +41,22 @@ type keyval struct {
 	tsMod time.Time
 }
 
-// An implementation of RateLimitStore which keeps all data in memory protected
-// by a mutex
+// RateLimitMem is an implementation of RateLimitStore which keeps all data in
+// memory protected by a mutex
 type RateLimitMem struct {
 	m map[string]keyval
 	l sync.RWMutex
 }
 
+// NewRateLimitMem returns a new RateLimitMem, ready to be used as a
+// RateLimitStore
 func NewRateLimitMem() *RateLimitMem {
 	return &RateLimitMem{
 		m: map[string]keyval{},
 	}
 }
 
-// Implementation of IncrByCeil for RateLimitStore
+// IncrByCeil is an implementation of IncrByCeil for RateLimitStore
 func (m *RateLimitMem) IncrByCeil(key string, amount, max int64) (int64, bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
@@ -71,7 +73,7 @@ func (m *RateLimitMem) IncrByCeil(key string, amount, max int64) (int64, bool) {
 	return newAmount, maxd
 }
 
-// Implementation of DecrBy for RateLimitStore
+// DecrBy is an implementation of DecrBy for RateLimitStore
 func (m *RateLimitMem) DecrBy(key string, amount int64) int64 {
 	m.l.Lock()
 	defer m.l.Unlock()
@@ -83,21 +85,21 @@ func (m *RateLimitMem) DecrBy(key string, amount int64) int64 {
 	return newAmount
 }
 
-// Implementation of Get for RateLimitStore
+// Get is an implementation of Get for RateLimitStore
 func (m *RateLimitMem) Get(key string) int64 {
 	m.l.Lock()
 	defer m.l.Unlock()
 	return m.m[key].val
 }
 
-// Implementation of LastModified for RateLimitStore
+// LastModified is an implementation of LastModified for RateLimitStore
 func (m *RateLimitMem) LastModified(key string) time.Time {
 	m.l.RLock()
 	defer m.l.RUnlock()
 	return m.m[key].tsMod
 }
 
-// Implementation of Clean for RateLimitStore
+// Clean is an implementation of Clean for RateLimitStore
 func (m *RateLimitMem) Clean(staleTimeout time.Duration) {
 	tsThresh := time.Now().Add(-1 * staleTimeout)
 

@@ -13,7 +13,7 @@ type apiTokData struct {
 	TS   time.Time
 }
 
-// Returns an api token, signed with the given secret
+// New returns an api token, signed with the given secret
 func New(secret []byte) string {
 	tok := apiTokData{
 		UUID: uuid.New(),
@@ -23,11 +23,11 @@ func New(secret []byte) string {
 	return sig.New(d, secret)
 }
 
-// Implements a token bucket rate limiting system on a per-api-token basis,
-// except instead of tokens in the bucket we instead use time. When a request is
-// made it's first checked if the bucket is empty, if so the request is
-// rejected. When the request is completed the time it took to complete is
-// removed from the bucket.
+// RateLimiter implements a token bucket rate limiting system on a per-api-token
+// basis, except instead of tokens in the bucket we instead use time. When a
+// request is made it's first checked if the bucket is empty, if so the request
+// is rejected. When the request is completed the time it took to complete is
+// removed from the bucket (the bucket may have negative time in it)
 //
 // At intervals new time is added to the bucket, up to a specified maximum
 // capacity. This system has a few nice qualities:
@@ -52,8 +52,9 @@ type RateLimiter struct {
 	Backend RateLimitStore
 }
 
-// Returns a new RateLimiter initialized with all default values. The fields can
-// be changed to the desired values before the RateLimiter starts being used
+// NewRateLimiter returns a new RateLimiter initialized with all default values.
+// The fields can be changed to the desired values before the RateLimiter starts
+// being used
 func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{
 		Capacity:    30 * time.Second,
@@ -68,12 +69,19 @@ func NewRateLimiter() *RateLimiter {
 type UseResult int
 
 const (
+	// Success means that the token can be used (the bucket for it isn't empty)
 	Success UseResult = iota
+
+	// TokenInvalid means that the token isn't a valid token
 	TokenInvalid
+
+	// RateLimited means that the token can't be used because its bucket is
+	// empty
 	RateLimited
 )
 
-// Attempts to use the given api token. May return any of the UseResults
+// CanUse attempts to use the given api token (calling sig.Verify on it first).
+// May return any of the UseResults
 func (r *RateLimiter) CanUse(token string, secret []byte) UseResult {
 	if !sig.Verify(token, secret) {
 		return TokenInvalid
@@ -82,8 +90,9 @@ func (r *RateLimiter) CanUse(token string, secret []byte) UseResult {
 	return r.CanUseRaw(token)
 }
 
-// Checks if you can "use" the given identifier, checking that it has a non-zero
-// amount of time in its bucket first. Will either return Success or RateLimited
+// CanUseRaw checks if you can "use" the given identifier, which could be
+// anything, checking that it has a non-zero amount of time in its bucket first.
+// Will either return Success or RateLimited
 func (r *RateLimiter) CanUseRaw(identifier string) UseResult {
 
 	// TODO there's a slight bug in this portion. If there's time in the bucket
@@ -109,7 +118,7 @@ func (r *RateLimiter) CanUseRaw(identifier string) UseResult {
 	return Success
 }
 
-// Removes the given amount of time for the identifier. Assumes that the
+// Use removes the given amount of time for the identifier. Assumes that the
 // identifier is legitimate.
 func (r *RateLimiter) Use(identifier string, toRemove time.Duration) {
 	r.Backend.DecrBy(identifier, toRemove.Nanoseconds())

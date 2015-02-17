@@ -1,4 +1,4 @@
-// A simple package for creating and verifying signed arbitrary data
+// Package sig is a package for creating and verifying signed arbitrary data
 package sig
 
 import (
@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// Returns a string which is a combination of the given data and a signature of
-// the given data, signed by the given secret
+// New returns a string which is a combination of the given data and a signature
+// of the given data, signed by the given secret
 func New(data, secret []byte) string {
 	h := hmac.New(sha1.New, secret)
 	h.Write(data)
@@ -19,8 +19,8 @@ func New(data, secret []byte) string {
 	return data64 + ":" + sum64
 }
 
-// Extracts the encoded, signed data in the given sig. Returns nil if the data
-// can't be decoded or verified
+// Extract extracts the encoded, signed data in the given sig. Returns nil if
+// the data can't be decoded or verified
 func Extract(sig string, secret []byte) []byte {
 	i := strings.IndexByte(sig, ':')
 	if i < 0 {
@@ -48,7 +48,7 @@ func Extract(sig string, secret []byte) []byte {
 	return data
 }
 
-// Shortcut for Extract(sig, secret) != nil
+// Verify is a shortcut for Extract(sig, secret) != nil
 func Verify(sig string, secret []byte) bool {
 	return Extract(sig, secret) != nil
 }

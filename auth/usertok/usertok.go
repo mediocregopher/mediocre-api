@@ -1,4 +1,5 @@
-// Creates tokens which authenticate and identify users in a stateless way
+// Package usertok creates tokens which authenticate and identify users in a
+// stateless way
 package usertok
 
 import (
@@ -13,7 +14,7 @@ type userTokData struct {
 	Random []byte
 }
 
-// Given a user identifying string and a secret, returns a user token
+// New returns a new user token given a user identifying string and a secret
 func New(user string, secret []byte) string {
 	shared := make([]byte, 128)
 	if _, err := rand.Read(shared); err != nil {
@@ -25,9 +26,9 @@ func New(user string, secret []byte) string {
 	return sig.New(userTokD, secret)
 }
 
-// Given a userTok as returned by New(), extracts the user identifier that was
-// passed into New() and returns it. Returns empty string if the user token
-// can't be extracted due to an invalid token
+// ExtractUser takes in a userTok as returned by New() and extracts the user
+// identifier that was passed into New() and returns it. Returns empty string if
+// the user token can't be extracted due to an invalid token
 func ExtractUser(userTok string, secret []byte) string {
 	userTokD := sig.Extract(userTok, secret)
 	if userTokD == nil {
