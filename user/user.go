@@ -6,6 +6,7 @@ package user
 
 import (
 	"strings"
+	"time"
 
 	"github.com/mediocregopher/radix.v2/redis"
 	"golang.org/x/crypto/bcrypt"
@@ -25,10 +26,14 @@ var (
 	ErrUserExists = ExpectedErr("user already exists")
 )
 
+// Fields found in the main user hash
 const (
-	emailField        = "e"
-	passwordHashField = "p"
-	verifiedField     = "v"
+	emailField          = "e"
+	passwordHashField   = "p"
+	verifiedField       = "v"
+	tsCreatedField      = "t"
+	tsLastLoggedInField = "tl"
+	tsModifiedField     = "tm"
 )
 
 // Cmder is an interface which is implemented by both the standard radix client,
@@ -67,6 +72,17 @@ func (s *System) Key(user string, extra ...string) string {
 	return k
 }
 
+func marshalTime(t time.Time) string {
+	ts, _ := t.MarshalText()
+	return string(ts)
+}
+
+func unmarshalTime(ts string) (time.Time, error) {
+	var t time.Time
+	err := t.UnmarshalText([]byte(ts))
+	return t, err
+}
+
 // Create attempts to create a new user with the given email and password. If
 // the user already exists ErrUserExists will be returned. If not the password
 // will be hashed and stored
@@ -84,7 +100,13 @@ func (s *System) Create(user, email, password string) error {
 		return err
 	}
 
-	err = s.c.Cmd("HMSET", key, passwordHashField, hash).Err
+	nowS := marshalTime(time.Now())
+	err = s.c.Cmd(
+		"HMSET", key,
+		passwordHashField, hash,
+		tsCreatedField, nowS,
+		tsModifiedField, nowS,
+	).Err
 	if err != nil {
 		return err
 	}
