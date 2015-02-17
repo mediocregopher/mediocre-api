@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 
-	"github.com/mediocregopher/mediocre-api/api/sig"
+	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
 
 type userTokData struct {

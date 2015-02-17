@@ -14,14 +14,12 @@ type RateLimitStore interface {
 	// it should be instead set to that max (and have that max returned). True
 	// should be returned in this case as well. The key should be assumed to be
 	// 0 if it didn't previously exist
-	IncrBy(key string, amount, max int64) (int64, bool)
+	IncrByCeil(key string, amount, max int64) (int64, bool)
 
 	// Decrements the given key by the given amount, and returns the value of
-	// the key after the decrement. If the key would go under the min value
-	// given it should be instead set to that min (and have that min returned).
-	// True should be returned in this case as well. The key should be assumed
-	// to be 0 if it didn't previously exist
-	DecrBy(key string, amount, min int64) (int64, bool)
+	// the key after the decrement. The key should be assumed to be 0 if it
+	// didn't previously exist
+	DecrBy(key string, amount int64) int64
 
 	// Retrieve the value of the given key. The key should be assumed to be 0 if
 	// it didn't previously exists
@@ -56,8 +54,8 @@ func NewRateLimitMem() *RateLimitMem {
 	}
 }
 
-// Implementation of IncrBy for RateLimitStore
-func (m *RateLimitMem) IncrBy(key string, amount, max int64) (int64, bool) {
+// Implementation of IncrByCeil for RateLimitStore
+func (m *RateLimitMem) IncrByCeil(key string, amount, max int64) (int64, bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
 	var maxd bool
@@ -74,20 +72,15 @@ func (m *RateLimitMem) IncrBy(key string, amount, max int64) (int64, bool) {
 }
 
 // Implementation of DecrBy for RateLimitStore
-func (m *RateLimitMem) DecrBy(key string, amount, min int64) (int64, bool) {
+func (m *RateLimitMem) DecrBy(key string, amount int64) int64 {
 	m.l.Lock()
 	defer m.l.Unlock()
-	var mind bool
 	newAmount := m.m[key].val - amount
-	if newAmount < min {
-		mind = true
-		newAmount = min
-	}
 	m.m[key] = keyval{
 		val:   newAmount,
 		tsMod: time.Now(),
 	}
-	return newAmount, mind
+	return newAmount
 }
 
 // Implementation of Get for RateLimitStore

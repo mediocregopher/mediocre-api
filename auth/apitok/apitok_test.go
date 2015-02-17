@@ -22,9 +22,13 @@ func TestRateLimiter(t *T) {
 		r.Use(token, 1*time.Second)
 	}
 	assert.Equal(t, RateLimited, r.CanUse(token, secret), "%#v", r.Backend)
-
 	time.Sleep(1 * time.Second)
 	assert.Equal(t, Success, r.CanUse(token, secret), "%#v", r.Backend)
-	r.Use(token, 1*time.Second)
+
+	r.Use(token, 2*time.Second)
 	assert.Equal(t, RateLimited, r.CanUse(token, secret), "%#v", r.Backend)
+	time.Sleep(1 * time.Second)
+	assert.Equal(t, RateLimited, r.CanUse(token, secret), "%#v", r.Backend)
+	time.Sleep(1 * time.Second)
+	assert.Equal(t, Success, r.CanUse(token, secret), "%#v", r.Backend)
 }

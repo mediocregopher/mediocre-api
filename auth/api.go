@@ -1,15 +1,15 @@
 // Wraps around an http multiplexer (e.g. http.ServeMux), providing automatic
 // rate-limiting and user authentication. See the package README for more
 // documentation and examples
-package api
+package auth
 
 import (
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/mediocregopher/mediocre-api/api/apitok"
-	"github.com/mediocregopher/mediocre-api/api/usertok"
+	"github.com/mediocregopher/mediocre-api/auth/apitok"
+	"github.com/mediocregopher/mediocre-api/auth/usertok"
 )
 
 // Various error responses this package may return (these will all be appended

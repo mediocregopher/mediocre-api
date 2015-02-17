@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
-
-	"github.com/mediocregopher/mediocre-api/api/sig"
+	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
 
 type apiTokData struct {
@@ -76,12 +75,7 @@ const (
 
 // Attempts to use the given api token. May return any of the UseResults
 func (r *RateLimiter) CanUse(token string, secret []byte) UseResult {
-	d := sig.Extract(token, secret)
-	if d == nil {
-		return TokenInvalid
-	}
-	var tok apiTokData
-	if err := json.Unmarshal(d, &tok); err != nil {
+	if !sig.Verify(token, secret) {
 		return TokenInvalid
 	}
 
@@ -103,7 +97,7 @@ func (r *RateLimiter) CanUseRaw(identifier string) UseResult {
 
 	var timeLeft int64
 	if toAdd > 0 {
-		timeLeft, _ = r.Backend.IncrBy(identifier, toAdd.Nanoseconds(), r.Capacity.Nanoseconds())
+		timeLeft, _ = r.Backend.IncrByCeil(identifier, toAdd.Nanoseconds(), r.Capacity.Nanoseconds())
 	} else {
 		timeLeft = r.Backend.Get(identifier)
 	}
@@ -118,5 +112,5 @@ func (r *RateLimiter) CanUseRaw(identifier string) UseResult {
 // Removes the given amount of time for the identifier. Assumes that the
 // identifier is legitimate.
 func (r *RateLimiter) Use(identifier string, toRemove time.Duration) {
-	r.Backend.DecrBy(identifier, toRemove.Nanoseconds(), 0)
+	r.Backend.DecrBy(identifier, toRemove.Nanoseconds())
 }
