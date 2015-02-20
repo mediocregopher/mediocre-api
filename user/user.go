@@ -24,7 +24,9 @@ func (e ExpectedErr) Error() string {
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserExists = ExpectedErr("user already exists")
+	ErrUserExists   = ExpectedErr("user already exists")
+	ErrUserNotFound = ExpectedErr("user not found")
+	ErrBadAuth      = ExpectedErr("could not authenticate user")
 )
 
 // Fields found in the main user hash
@@ -116,6 +118,37 @@ func (s *System) Create(user, email, password string) error {
 	}
 
 	return nil
+}
+
+func (s *System) set(user string, keyvals ...interface{}) error {
+	key := s.Key(user)
+	nowS := marshalTime(time.Now())
+	return s.c.Cmd("HMSET", key, tsModifiedField, nowS, keyvals).Err
+}
+
+// Login attempts to authenticate the user with the given password. If the
+// password matches the one in the db then tsLastLoggedIn is updated on the user
+// hash. Returns whether or not the user successfully logged in
+//
+// If this method returns true it may still return an error if updating
+// lastLoggedIn failed. In reality only errors accompanied by a false really
+// matter
+func (s *System) Login(user, password string) (bool, error) {
+	key := s.Key(user)
+	r := s.c.Cmd("HGET", key, passwordHashField)
+	if r.IsType(redis.Nil) {
+		return false, ErrUserNotFound
+	}
+	p, err := r.Str()
+	if err != nil {
+		return false, err
+	}
+
+	match := bcrypt.CompareHashAndPassword([]byte(p), []byte(password)) == nil
+	if match {
+		return true, s.set(user, tsLastLoggedInField, marshalTime(time.Now()))
+	}
+	return false, ErrBadAuth
 }
 
 // Get returns the Info for the given user, or nil if the user couldn't be found

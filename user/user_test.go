@@ -62,3 +62,52 @@ func TestGetNonExistant(t *T) {
 	require.Nil(t, err)
 	assert.Nil(t, pi)
 }
+
+func TestInternalSet(t *T) {
+	s := testSystem(t)
+	user := randStr()
+
+	start := time.Now()
+	err := s.set(user, "foo", "bar", "baz", "buz")
+	require.Nil(t, err)
+	end := time.Now()
+
+	t.Log(s.Key(user))
+	r := s.c.Cmd("HMGET", s.Key(user), tsModifiedField, "foo", "baz", "box")
+	l, err := r.List()
+	require.Nil(t, err)
+
+	tsm, err := unmarshalTime(l[0])
+	require.Nil(t, err)
+	assert.True(t, tsm.After(start) && tsm.Before(end))
+
+	assert.Equal(t, "bar", l[1])
+	assert.Equal(t, "buz", l[2])
+	assert.Equal(t, "", l[3])
+}
+
+func TestLogin(t *T) {
+	s := testSystem(t)
+	user, email, password := randStr(), randStr(), randStr()
+	assert.Nil(t, s.Create(user, email, password))
+
+	start := time.Now()
+	ok, err := s.Login(user, password)
+	require.Nil(t, err)
+	require.True(t, ok)
+	end := time.Now()
+
+	tsls, err := s.c.Cmd("HGET", s.Key(user), tsLastLoggedInField).Str()
+	require.Nil(t, err)
+	tsl, err := unmarshalTime(tsls)
+	require.Nil(t, err)
+	assert.True(t, tsl.After(start) && tsl.Before(end))
+
+	ok, err = s.Login(user, password+"bogus")
+	assert.Equal(t, ErrBadAuth, err)
+	assert.False(t, ok)
+
+	ok, err = s.Login(user+"bogus", password)
+	assert.Equal(t, ErrUserNotFound, err)
+	assert.False(t, ok)
+}
