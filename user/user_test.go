@@ -24,12 +24,17 @@ func randStr() string {
 	return hex.EncodeToString(b)
 }
 
+func randUser(t *T, s *System) (string, string, string) {
+	user, email, password := randStr(), randStr(), randStr()
+	require.Nil(t, s.Create(user, email, password))
+	return user, email, password
+}
+
 func TestCreateGet(t *T) {
 	s := testSystem(t)
 	start := time.Now()
 
-	user, email, password := randStr(), randStr(), randStr()
-	assert.Nil(t, s.Create(user, email, password))
+	user, email, password := randUser(t, s)
 	assert.Equal(t, ErrUserExists, s.Create(user, email, password))
 
 	end := time.Now()
@@ -88,8 +93,7 @@ func TestInternalSet(t *T) {
 
 func TestLogin(t *T) {
 	s := testSystem(t)
-	user, email, password := randStr(), randStr(), randStr()
-	assert.Nil(t, s.Create(user, email, password))
+	user, _, password := randUser(t, s)
 
 	start := time.Now()
 	ok, err := s.Login(user, password)
@@ -110,4 +114,19 @@ func TestLogin(t *T) {
 	ok, err = s.Login(user+"bogus", password)
 	assert.Equal(t, ErrUserNotFound, err)
 	assert.False(t, ok)
+}
+
+func TestVerify(t *T) {
+	s := testSystem(t)
+	user, _, _ := randUser(t, s)
+
+	pi, err := s.GetPrivate(user)
+	require.Nil(t, err)
+	assert.False(t, pi.Verified)
+
+	require.Nil(t, s.Verify(user))
+
+	pi, err = s.GetPrivate(user)
+	require.Nil(t, err)
+	assert.True(t, pi.Verified)
 }

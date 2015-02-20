@@ -163,3 +163,9 @@ func (s *System) GetPrivate(user string) (*PrivateInfo, error) {
 	key := s.Key(user)
 	return respToPrivateInfo(user, s.c.Cmd("HGETALL", key))
 }
+
+// Verify marks the user as having been "verified", either through email or
+// other means
+func (s *System) Verify(user string) error {
+	return s.set(user, verifiedField, "1")
+}
