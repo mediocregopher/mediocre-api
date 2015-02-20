@@ -22,6 +22,7 @@ func (e ExpectedErr) Error() string {
 	return string(e)
 }
 
+// Errors which can be expected from various methods in this package
 var (
 	ErrUserExists = ExpectedErr("user already exists")
 )
@@ -73,14 +74,17 @@ func (s *System) Key(user string, extra ...string) string {
 }
 
 func marshalTime(t time.Time) string {
-	ts, _ := t.MarshalText()
+	ts, _ := t.UTC().MarshalText()
 	return string(ts)
 }
 
 func unmarshalTime(ts string) (time.Time, error) {
 	var t time.Time
+	if ts == "" {
+		return t, nil
+	}
 	err := t.UnmarshalText([]byte(ts))
-	return t, err
+	return t.UTC(), err
 }
 
 // Create attempts to create a new user with the given email and password. If
@@ -112,4 +116,17 @@ func (s *System) Create(user, email, password string) error {
 	}
 
 	return nil
+}
+
+// Get returns the Info for the given user, or nil if the user couldn't be found
+func (s *System) Get(user string) (*Info, error) {
+	key := s.Key(user)
+	return respToInfo(user, s.c.Cmd("HGETALL", key))
+}
+
+// GetPrivate returns the PrivateInfo for the given user, or nil if the user
+// couldn't be found
+func (s *System) GetPrivate(user string) (*PrivateInfo, error) {
+	key := s.Key(user)
+	return respToPrivateInfo(user, s.c.Cmd("HGETALL", key))
 }
