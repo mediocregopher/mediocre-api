@@ -112,7 +112,7 @@ func TestLogin(t *T) {
 	assert.False(t, ok)
 
 	ok, err = s.Login(user+"bogus", password)
-	assert.Equal(t, ErrUserNotFound, err)
+	assert.Equal(t, ErrNotFound, err)
 	assert.False(t, ok)
 }
 
@@ -129,4 +129,29 @@ func TestVerify(t *T) {
 	pi, err = s.GetPrivate(user)
 	require.Nil(t, err)
 	assert.True(t, pi.Verified)
+}
+
+func TestDisable(t *T) {
+	s := testSystem(t)
+	user, _, password := randUser(t, s)
+
+	require.Nil(t, s.Disable(user))
+
+	pi, err := s.GetPrivate(user)
+	require.Nil(t, err)
+	assert.True(t, pi.Disabled)
+
+	ok, err := s.Login(user, password)
+	assert.Equal(t, ErrDisabled, err)
+	assert.False(t, ok)
+
+	require.Nil(t, s.Enable(user))
+
+	pi, err = s.GetPrivate(user)
+	require.Nil(t, err)
+	assert.False(t, pi.Disabled)
+
+	ok, err = s.Login(user, password)
+	assert.Nil(t, err)
+	assert.True(t, ok)
 }

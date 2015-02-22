@@ -21,6 +21,7 @@ type PrivateInfo struct {
 	Verified     bool
 	LastLoggedIn time.Time
 	Modified     time.Time
+	Disabled     bool
 }
 
 func mapToInfo(user string, m map[string]string) (*Info, error) {
@@ -61,7 +62,8 @@ func respToPrivateInfo(user string, r *redis.Resp) (*PrivateInfo, error) {
 	var pi PrivateInfo
 	pi.Info = *i
 	pi.Email = m[emailField]
-	pi.Verified = m[verifiedField] != ""
+	pi.Verified = m[verifiedField] == "1"
+	pi.Disabled = m[disabledField] == "1"
 	if pi.LastLoggedIn, err = unmarshalTime(m[tsLastLoggedInField]); err != nil {
 		return nil, err
 	}

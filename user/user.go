@@ -24,9 +24,10 @@ func (e ExpectedErr) Error() string {
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserExists   = ExpectedErr("user already exists")
-	ErrUserNotFound = ExpectedErr("user not found")
-	ErrBadAuth      = ExpectedErr("could not authenticate user")
+	ErrUserExists = ExpectedErr("user already exists")
+	ErrNotFound   = ExpectedErr("user not found")
+	ErrBadAuth    = ExpectedErr("could not authenticate user")
+	ErrDisabled   = ExpectedErr("user account is disabled")
 )
 
 // Fields found in the main user hash
@@ -37,6 +38,7 @@ const (
 	tsCreatedField      = "t"
 	tsLastLoggedInField = "tl"
 	tsModifiedField     = "tm"
+	disabledField       = "d"
 )
 
 // Cmder is an interface which is implemented by both the standard radix client,
@@ -135,13 +137,16 @@ func (s *System) set(user string, keyvals ...interface{}) error {
 // matter
 func (s *System) Login(user, password string) (bool, error) {
 	key := s.Key(user)
-	r := s.c.Cmd("HGET", key, passwordHashField)
-	if r.IsType(redis.Nil) {
-		return false, ErrUserNotFound
-	}
-	p, err := r.Str()
+	l, err := s.c.Cmd("HMGET", key, passwordHashField, disabledField).List()
 	if err != nil {
 		return false, err
+	}
+	p, disabled := l[0], l[1]
+
+	if p == "" {
+		return false, ErrNotFound
+	} else if disabled == "1" {
+		return false, ErrDisabled
 	}
 
 	match := bcrypt.CompareHashAndPassword([]byte(p), []byte(password)) == nil
@@ -168,4 +173,18 @@ func (s *System) GetPrivate(user string) (*PrivateInfo, error) {
 // other means
 func (s *System) Verify(user string) error {
 	return s.set(user, verifiedField, "1")
+}
+
+// Disable marks the user as being disabled, meaning they have effectively
+// deleted their account without actually deleting any data. They cannot log in
+// and do not show up anywhere
+func (s *System) Disable(user string) error {
+	return s.set(user, disabledField, "1")
+}
+
+// Enable marks the user as having an account enabled. Accounts are enabled by
+// default when created, this only really has an effect when an accound was
+// previously Disable'd
+func (s *System) Enable(user string) error {
+	return s.set(user, disabledField, "0")
 }
