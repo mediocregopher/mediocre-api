@@ -89,11 +89,10 @@ type handlerOpt struct {
 
 var blankHandlerOpt handlerOpt
 
-// API is an http.Handler which wraps a given Muxer, providing automatic
-// rate-limiting and user authentication
-type API struct {
-	mux         Muxer
-	handlerOpts map[string]*handlerOpt
+// APIOpts describe all the user set-able modifications which can be made to the
+// behavior of API. A default APIOpts is returned by NewAPIOpts, and fields on
+// it can be modified before being passed into NewAPI
+type APIOpts struct {
 
 	// Contains the rate limiting implementation. The fields on the RateLimiter
 	// can be changed prior to API actually serving requests
@@ -105,22 +104,42 @@ type API struct {
 	Secret []byte
 }
 
-// NewAPI takes in a Muxer and returns an API which wraps around it
-func NewAPI(mux Muxer) *API {
+// NewAPIOpts returns the default APIOpts struct, the fields on which can be
+// changed in order to modify behavior before being passed into NewAPI
+func NewAPIOpts() *APIOpts {
+	return &APIOpts{
+		RateLimiter: apitok.NewRateLimiter(),
+	}
+}
+
+// API is an http.Handler which wraps a given Muxer, providing automatic
+// rate-limiting and user authentication
+type API struct {
+	mux         Muxer
+	handlerOpts map[string]*handlerOpt
+	o           *APIOpts
+}
+
+// NewAPI takes in a Muxer and returns an API which wraps around it. If the
+// given APIOpts is nil the default will be used
+func NewAPI(mux Muxer, o *APIOpts) *API {
+	if o == nil {
+		o = NewAPIOpts()
+	}
 	return &API{
 		mux:         mux,
 		handlerOpts: map[string]*handlerOpt{},
-		RateLimiter: apitok.NewRateLimiter(),
+		o:           o,
 	}
 }
 
 // NewAPIToken generates a new api token which will work with the secret this
 // API is using.  Will return empty string if Secret isn't set
 func (a *API) NewAPIToken() string {
-	if a.Secret == nil {
+	if a.o.Secret == nil {
 		return ""
 	}
-	return apitok.New(a.Secret)
+	return apitok.New(a.o.Secret)
 }
 
 // GetAPIToken returns the api token as sent by the client. Will return empty
@@ -133,24 +152,24 @@ func (a *API) GetAPIToken(r *http.Request) string {
 // can later be retrieved from the token using GetUser). Will return empty
 // string if Secret isn't set
 func (a *API) NewUserToken(user string) string {
-	if a.Secret == nil {
+	if a.o.Secret == nil {
 		return ""
 	}
-	return usertok.New(user, a.Secret)
+	return usertok.New(user, a.o.Secret)
 }
 
 // GetUser returns the user identifier held by the user token from the given
 // request. Returns empty string if the user token header isn't set or invalid,
 // or if Secret isn't set
 func (a *API) GetUser(r *http.Request) string {
-	if a.Secret == nil {
+	if a.o.Secret == nil {
 		return ""
 	}
 	userTok := r.Header.Get("X-USER-TOKEN")
 	if userTok == "" {
 		return ""
 	}
-	return usertok.ExtractUser(userTok, a.Secret)
+	return usertok.ExtractUser(userTok, a.o.Secret)
 }
 
 func (a *API) getHandlerOpt(pattern string) *handlerOpt {
@@ -183,7 +202,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var token string
 
 	if o.flags&IPRateLimited != 0 {
-		switch a.RateLimiter.CanUseRaw(r.RemoteAddr) {
+		switch a.o.RateLimiter.CanUseRaw(r.RemoteAddr) {
 		case apitok.Success:
 			token = r.RemoteAddr
 		case apitok.RateLimited:
@@ -197,14 +216,14 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// We only rate limit by api token if we aren't rate limiting by ip
-	} else if o.flags&NoAPITokenRequired == 0 && a.Secret != nil {
+	} else if o.flags&NoAPITokenRequired == 0 && a.o.Secret != nil {
 		apiToken := a.GetAPIToken(r)
 		if apiToken == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, APITokenMissing)
 			return
 		}
-		switch a.RateLimiter.CanUse(apiToken, a.Secret) {
+		switch a.o.RateLimiter.CanUse(apiToken, a.o.Secret) {
 		case apitok.Success:
 			token = apiToken
 		case apitok.TokenInvalid:
@@ -223,7 +242,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if a.requiresUserAuth(r, o.flags) {
-		if a.Secret == nil {
+		if a.o.Secret == nil {
 			w.WriteHeader(500)
 			fmt.Fprintf(w, SecretNotSet)
 			return
@@ -236,7 +255,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if usertok.ExtractUser(userTok, a.Secret) == "" {
+		if usertok.ExtractUser(userTok, a.o.Secret) == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, UserTokenInvalid)
 			return
@@ -248,7 +267,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if token != "" {
 		elapsed := time.Since(start)
-		a.RateLimiter.Use(token, elapsed)
+		a.o.RateLimiter.Use(token, elapsed)
 	}
 }
 

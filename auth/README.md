@@ -31,12 +31,14 @@ func main() {
 	// The auth api wraps a normal http request muxer. It can wrap anything
 	// else which implements the Muxer interface as well.
 	mux := http.NewServeMux()
-	a := auth.NewAPI(mux)
 
 	// Rate-limiting will not work without a set secret, nor will user
 	// authentication. If clients are load-balanced across multiple instances of
 	// this process the processes must all be using the same secret
-	a.Secret = []byte("wubalubadubdub!")
+	o := auth.NewAPIOpts()
+	o.Secret = []byte("wubalubadubdub!")
+
+	a := auth.NewAPI(mux, o)
 
 	// By default all requests require an api token, and are rate-limited based
 	// on that. There needs to be an endpoint for the client to retrieve an api

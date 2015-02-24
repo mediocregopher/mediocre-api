@@ -13,8 +13,9 @@ import (
 var testAPI, testMux = func() (*API, *http.ServeMux) {
 	secret := []byte("wubalubadubdub!")
 	s := http.NewServeMux()
-	a := NewAPI(s)
-	a.Secret = secret
+	o := NewAPIOpts()
+	o.Secret = secret
+	a := NewAPI(s, o)
 
 	a.SetHandlerFlags("/foo", NoAPITokenRequired)
 	s.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
