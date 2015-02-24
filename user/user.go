@@ -24,7 +24,7 @@ func (e ExpectedErr) Error() string {
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserExists = ExpectedErr("user already exists")
+	ErrUserExists = ExpectedErr("user exists")
 	ErrNotFound   = ExpectedErr("user not found")
 	ErrBadAuth    = ExpectedErr("could not authenticate user")
 	ErrDisabled   = ExpectedErr("user account is disabled")

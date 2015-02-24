@@ -145,6 +145,7 @@ func (a *API) NewAPIToken() string {
 // GetAPIToken returns the api token as sent by the client. Will return empty
 // string if the client has not set one
 func (a *API) GetAPIToken(r *http.Request) string {
+	// TODO use constant for this string
 	return r.Header.Get("X-API-TOKEN")
 }
 
