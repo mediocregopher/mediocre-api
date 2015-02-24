@@ -25,6 +25,12 @@ var (
 	UnknownProblem      = "unknown problem"
 )
 
+// Various http headers which this package will look for
+const (
+	APITokenHeader  = "X-API-TOKEN"
+	UserTokenHeader = "X-USER-TOKEN"
+)
+
 // A Muxer is set up with strings (e.g. "/foo", "/") which it will subsequently
 // match incoming requests to and under normal circumstances execute the
 // http.Handler for those requests. http.ServeMux is an example of a Muxer.
@@ -145,8 +151,7 @@ func (a *API) NewAPIToken() string {
 // GetAPIToken returns the api token as sent by the client. Will return empty
 // string if the client has not set one
 func (a *API) GetAPIToken(r *http.Request) string {
-	// TODO use constant for this string
-	return r.Header.Get("X-API-TOKEN")
+	return r.Header.Get(APITokenHeader)
 }
 
 // NewUserToken generates a new user token for the given user identifier (which
@@ -166,7 +171,7 @@ func (a *API) GetUser(r *http.Request) string {
 	if a.o.Secret == nil {
 		return ""
 	}
-	userTok := r.Header.Get("X-USER-TOKEN")
+	userTok := r.Header.Get(UserTokenHeader)
 	if userTok == "" {
 		return ""
 	}
@@ -249,7 +254,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		userTok := r.Header.Get("X-User-Token")
+		userTok := r.Header.Get(UserTokenHeader)
 		if userTok == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, UserTokenMissing)

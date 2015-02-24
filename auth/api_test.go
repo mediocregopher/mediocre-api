@@ -42,10 +42,10 @@ func req(t *T, method, endpnt, apiTok, userTok string) (int, string) {
 	r, err := http.NewRequest(method, endpnt, nil)
 	require.Nil(t, err)
 	if apiTok != "" {
-		r.Header.Set("X-API-TOKEN", apiTok)
+		r.Header.Set(APITokenHeader, apiTok)
 	}
 	if userTok != "" {
-		r.Header.Set("X-USER-TOKEN", userTok)
+		r.Header.Set(UserTokenHeader, userTok)
 	}
 	w := httptest.NewRecorder()
 	testAPI.ServeHTTP(w, r)
