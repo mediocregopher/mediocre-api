@@ -1,11 +1,10 @@
 package user
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	. "testing"
 	"time"
 
+	"github.com/mediocregopher/mediocre-api/common/commontest"
 	"github.com/mediocregopher/radix.v2/pool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,14 +17,10 @@ func testSystem(t *T) *System {
 	return New(p)
 }
 
-func randStr() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
 func randUser(t *T, s *System) (string, string, string) {
-	user, email, password := randStr(), randStr(), randStr()
+	user := commontest.RandStr()
+	email := commontest.RandStr()
+	password := commontest.RandStr()
 	require.Nil(t, s.Create(user, email, password))
 	return user, email, password
 }
@@ -57,7 +52,7 @@ func TestCreateGet(t *T) {
 
 func TestGetNonExistant(t *T) {
 	s := testSystem(t)
-	user := randStr()
+	user := commontest.RandStr()
 
 	i, err := s.Get(user)
 	require.Nil(t, err)
@@ -70,7 +65,7 @@ func TestGetNonExistant(t *T) {
 
 func TestInternalSet(t *T) {
 	s := testSystem(t)
-	user := randStr()
+	user := commontest.RandStr()
 
 	start := time.Now()
 	err := s.set(user, "foo", "bar", "baz", "buz")

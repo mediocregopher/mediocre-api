@@ -6,25 +6,19 @@ import (
 
 	"github.com/mediocregopher/mediocre-api/auth"
 	"github.com/mediocregopher/mediocre-api/auth/authtest"
-	"github.com/mediocregopher/radix.v2/pool"
+	"github.com/mediocregopher/mediocre-api/common/commontest"
 	"github.com/stretchr/testify/assert"
 )
 
-var testSecret = []byte("woopwoop")
-
 var testAPI = func() *auth.API {
-	p, err := pool.New("tcp", "localhost:6379", 10)
-	if err != nil {
-		panic(err)
-	}
-
-	o := auth.NewAPIOpts()
-	o.Secret = testSecret
-	return NewMux(o, p).(*auth.API)
+	return NewMux(commontest.APIStarterKit()).(*auth.API)
 }()
 
 func TestNewUser(t *T) {
-	user, email, password := randStr(), randStr(), randStr()
+	user := commontest.RandStr()
+	email := commontest.RandStr()
+	password := commontest.RandStr()
+
 	code, body := authtest.Req(testAPI, "POST", "/new-user", "",
 		fmt.Sprintf(
 			`{"Email":"%s","Username":"%s","Password":"%s"}`,

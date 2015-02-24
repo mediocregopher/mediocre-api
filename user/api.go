@@ -6,9 +6,10 @@ import (
 	"net/http"
 
 	"github.com/mediocregopher/mediocre-api/auth"
+	"github.com/mediocregopher/mediocre-api/common"
 )
 
-func NewMux(o *auth.APIOpts, c Cmder) http.Handler {
+func NewMux(o *auth.APIOpts, c common.Cmder) http.Handler {
 	m := http.NewServeMux()
 	a := auth.NewAPI(m, o)
 	s := New(c)
