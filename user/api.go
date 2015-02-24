@@ -9,6 +9,8 @@ import (
 	"github.com/mediocregopher/mediocre-api/common"
 )
 
+// NewMux returns a new http.Handler (in reality a http.ServeMux wrapped with an
+// auth.API) which has the basic suite of user creation/modification endpoints
 func NewMux(o *auth.APIOpts, c common.Cmder) http.Handler {
 	m := http.NewServeMux()
 	a := auth.NewAPI(m, o)
