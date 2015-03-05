@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json"
 	"fmt"
 	. "testing"
 
@@ -13,6 +14,24 @@ import (
 var testAPI = func() *auth.API {
 	return NewMux(commontest.APIStarterKit()).(*auth.API)
 }()
+
+func testCreateUser(t *T) (string, string, string) {
+	user := commontest.RandStr()
+	email := commontest.RandEmail()
+	password := commontest.RandStr()
+
+	reqBody := fmt.Sprintf(
+		`{"Email":"%s","Username":"%s","Password":"%s"}`,
+		email,
+		user,
+		password,
+	)
+
+	code, body := authtest.Req(testAPI, "POST", "/new-user", "", reqBody)
+	assert.Equal(t, 200, code)
+	assert.Equal(t, "", body)
+	return user, email, password
+}
 
 func TestNewUser(t *T) {
 	user := commontest.RandStr()
@@ -45,4 +64,23 @@ func TestNewUser(t *T) {
 	code, body = authtest.Req(testAPI, "POST", "/new-user", "", reqBody)
 	assert.Equal(t, 400, code)
 	assert.Equal(t, ErrUserExists.Error()+"\n", body)
+}
+
+// TestUserToken tests retrieving a user token from the api. Essentially,
+// logging in
+func TestUserToken(t *T) {
+	user, _, password := testCreateUser(t)
+	url := fmt.Sprintf("/%s/token", user)
+
+	reqBody := `{"Password":"aaaaaa"}`
+	code, body := authtest.Req(testAPI, "GET", url, "", reqBody)
+	assert.Equal(t, 400, code)
+	assert.Equal(t, ErrBadAuth.Error()+"\n", body)
+
+	reqBody = fmt.Sprintf(`{"Password":"%s"}`, password)
+	code, body = authtest.Req(testAPI, "GET", url, "", reqBody)
+	assert.Equal(t, 200, code)
+	s := struct{ Token string }{}
+	assert.Nil(t, json.Unmarshal([]byte(body), &s))
+	assert.NotEqual(t, "", s.Token)
 }

@@ -4,6 +4,8 @@ package apihelper
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/mediocregopher/mediocre-api/pickyjson"
@@ -61,4 +63,11 @@ func Prepare(
 	}
 
 	return true
+}
+
+// JSONSuccess json encodes the given return value and writes that to the given
+// io.Writer (presumably an http.ResponseWriter)
+func JSONSuccess(w io.Writer, i interface{}) {
+	json.NewEncoder(w).Encode(i)
+	fmt.Fprintf(w, "\n")
 }
