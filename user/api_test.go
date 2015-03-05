@@ -3,12 +3,14 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	. "testing"
 
 	"github.com/mediocregopher/mediocre-api/auth"
 	"github.com/mediocregopher/mediocre-api/auth/authtest"
 	"github.com/mediocregopher/mediocre-api/common/commontest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var testAPI = func() *auth.API {
@@ -83,4 +85,26 @@ func TestAPIUserToken(t *T) {
 	s := struct{ Token string }{}
 	assert.Nil(t, json.Unmarshal([]byte(body), &s))
 	assert.NotEqual(t, "", s.Token)
+}
+
+func requireJSONUnmarshal(t *T, body string, i interface{}) {
+	require.Nil(t, json.Unmarshal([]byte(body), &i), string(debug.Stack()))
+}
+
+func TestAPIUserGet(t *T) {
+	user, email, _ := testAPICreateUser(t)
+	url := fmt.Sprintf("/%s", user)
+	var i PrivateInfo
+
+	code, body := authtest.Req(testAPI, "GET", url, "", "")
+	assert.Equal(t, 200, code)
+	requireJSONUnmarshal(t, body, &i)
+	assert.Equal(t, i.Name, user)
+	assert.Equal(t, i.Email, "")
+
+	code, body = authtest.Req(testAPI, "GET", url, user, "")
+	assert.Equal(t, 200, code)
+	requireJSONUnmarshal(t, body, &i)
+	assert.Equal(t, i.Name, user)
+	assert.Equal(t, i.Email, email)
 }

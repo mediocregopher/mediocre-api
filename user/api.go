@@ -43,6 +43,15 @@ func finalErr(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
+type userHandlerFunc func(
+	s *System, a *auth.API, w http.ResponseWriter, r *http.Request, user string,
+)
+
+var userHandlerFuncs = map[string]userHandlerFunc{
+	"":      handleGet,
+	"token": handleToken,
+}
+
 // NewMux returns a new http.Handler (in reality a http.ServeMux wrapped with an
 // auth.API) which has the basic suite of user creation/modification endpoints
 func NewMux(o *auth.APIOpts, c common.Cmder) http.Handler {
@@ -71,14 +80,17 @@ func NewMux(o *auth.APIOpts, c common.Cmder) http.Handler {
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var user, action string
 		remaining := rend.URL(r.URL, &user, &action)
-		if remaining != "" || user == "" || action == "" {
+		if remaining != "" || user == "" {
 			http.Error(w, "unknown endpoint", 404)
+			return
 		}
 
-		switch action {
-		case "token":
-			handleToken(s, a, w, r, user)
+		f, ok := userHandlerFuncs[action]
+		if !ok {
+			http.Error(w, "unknown endpoint", 404)
+			return
 		}
+		f(s, a, w, r, user)
 	})
 
 	return a
@@ -107,4 +119,28 @@ func handleToken(
 	token := a.NewUserToken(user)
 
 	apihelper.JSONSuccess(w, &struct{ Token string }{token})
+}
+
+// Handles retrieving a user's information by their username
+func handleGet(
+	s *System, a *auth.API, w http.ResponseWriter, r *http.Request, user string,
+) {
+	if !apihelper.Prepare(w, r, nil, 0, "GET") {
+		return
+	}
+
+	authUser := a.GetUser(r)
+	var ret interface{}
+	var err error
+	if user == authUser {
+		ret, err = s.GetPrivate(user)
+	} else {
+		ret, err = s.Get(user)
+	}
+
+	if err != nil {
+		finalErr(w, r, err)
+	} else {
+		apihelper.JSONSuccess(w, &ret)
+	}
 }
