@@ -1,13 +1,32 @@
 package user
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/mediocregopher/mediocre-api/auth"
 	"github.com/mediocregopher/mediocre-api/common"
+	"github.com/mediocregopher/mediocre-api/common/apihelper"
+	"github.com/mediocregopher/mediocre-api/pickyjson"
 )
+
+// Body size limit for this module is very low, we're not dealing with large
+// requests here
+const bodySizeLimit = int64(4 * 1024)
+
+var usernameParam = pickyjson.Str{
+	MaxLength: 40,
+	Func:      govalidator.IsUTFLetterNumeric,
+}
+
+var emailParam = pickyjson.Str{
+	Map: govalidator.NormalizeEmail,
+}
+
+var passwordParam = pickyjson.Str{
+	MinLength: 6,
+	MaxLength: 255,
+}
 
 // NewMux returns a new http.Handler (in reality a http.ServeMux wrapped with an
 // auth.API) which has the basic suite of user creation/modification endpoints
@@ -17,42 +36,23 @@ func NewMux(o *auth.APIOpts, c common.Cmder) http.Handler {
 	s := New(c)
 
 	m.HandleFunc("/new-user", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, "must POST")
-			return
-		}
-
 		j := struct {
-			Username, Email, Password string
-		}{}
-
-		if err := json.NewDecoder(r.Body).Decode(&j); err != nil {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, err)
+			Username, Email, Password pickyjson.Str
+		}{
+			Username: usernameParam.Required(),
+			Email:    emailParam.Required(),
+			Password: passwordParam.Required(),
+		}
+		if !apihelper.Prepare(w, r, &j, bodySizeLimit, "POST") {
 			return
 		}
 
-		if j.Email == "" || len(j.Email) > 255 {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, "invalid email")
-			return
-		} else if j.Password == "" || len(j.Password) > 255 {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, "invalid password")
-			return
-		} else if j.Username == "" {
-			j.Username = j.Email
-		}
-
-		err := s.Create(j.Username, j.Email, j.Password)
+		err := s.Create(j.Username.Str, j.Email.Str, j.Password.Str)
 		if eerr, ok := err.(ExpectedErr); ok {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, eerr)
+			http.Error(w, eerr.Error(), 400)
 			return
 		} else if err != nil {
-			w.WriteHeader(500)
-			fmt.Fprintln(w, "unknown server-side error")
+			http.Error(w, "unknown server-side error", 500)
 			return
 		}
 	})

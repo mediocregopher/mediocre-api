@@ -5,6 +5,7 @@ package commontest
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/mediocregopher/mediocre-api/auth"
 	"github.com/mediocregopher/mediocre-api/common"
@@ -29,4 +30,11 @@ func RandStr() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+//RandEmail returns a string which could plausibly be an email (but definitely
+//isn't a real one)
+func RandEmail() string {
+	s := RandStr()
+	return fmt.Sprintf("%s@%s.com", s[:4], s[4:8])
 }
