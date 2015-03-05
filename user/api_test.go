@@ -15,7 +15,7 @@ var testAPI = func() *auth.API {
 	return NewMux(commontest.APIStarterKit()).(*auth.API)
 }()
 
-func testCreateUser(t *T) (string, string, string) {
+func testAPICreateUser(t *T) (string, string, string) {
 	user := commontest.RandStr()
 	email := commontest.RandEmail()
 	password := commontest.RandStr()
@@ -33,7 +33,7 @@ func testCreateUser(t *T) (string, string, string) {
 	return user, email, password
 }
 
-func TestNewUser(t *T) {
+func TestAPINewUser(t *T) {
 	user := commontest.RandStr()
 	email := commontest.RandEmail()
 	password := commontest.RandStr()
@@ -66,10 +66,10 @@ func TestNewUser(t *T) {
 	assert.Equal(t, ErrUserExists.Error()+"\n", body)
 }
 
-// TestUserToken tests retrieving a user token from the api. Essentially,
+// TestAPIUserToken tests retrieving a user token from the api. Essentially,
 // logging in
-func TestUserToken(t *T) {
-	user, _, password := testCreateUser(t)
+func TestAPIUserToken(t *T) {
+	user, _, password := testAPICreateUser(t)
 	url := fmt.Sprintf("/%s/token", user)
 
 	reqBody := `{"Password":"aaaaaa"}`
