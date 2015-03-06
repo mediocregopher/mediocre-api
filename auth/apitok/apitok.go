@@ -1,3 +1,4 @@
+// package apitok implements rate limiting api calls based on tokens/ips
 package apitok
 
 import (

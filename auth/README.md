@@ -1,5 +1,7 @@
 # mediocre-api/auth
 
+[![GoDoc](https://godoc.org/github.com/mediocregopher/mediocre-api/auth?status.svg)](https://godoc.org/github.com/mediocregopher/mediocre-api/auth)
+
 A simple wrapper around go's standard `net/http` package. It provides:
 
 * Rate-limiting based on an api token (or optionally on an ip address). Rate
