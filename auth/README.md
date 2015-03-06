@@ -113,3 +113,28 @@ a user token from the api, which authenticates the user however it wants and
 returns a token generated through `NewUserToken`. This token must be included
 with any requests that require user authentication as the `X-USER-TOKEN` header.
 The api may retrieve the authenticated user identifier using `GetUser`.
+
+## Builtin
+
+There is a builtin REST api which can be used (`NewMux`). It is not necessary to
+use this api if you don't wish to, the rest of the package is perfectly usable
+without it. It's simply a nice place to start, and has most of the repetitive
+user "stuff" implemented.
+
+Implemented endpoints are:
+
+-----
+
+```
+GET /token
+```
+
+Used to retrieve a new API token. Returns:
+
+```
+{
+    "Token": "API token"
+}
+```
+
+This may return `420 chill bro...` if the IP is rate-limited

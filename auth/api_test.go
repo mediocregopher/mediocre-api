@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +39,11 @@ var testAPI, testMux = func() (*API, *http.ServeMux) {
 	return a, s
 }()
 
-func req(t *T, method, endpnt, apiTok, userTok string) (int, string) {
+func req(
+	t *T, api http.Handler, method, endpnt, apiTok, userTok string,
+) (
+	int, string,
+) {
 	r, err := http.NewRequest(method, endpnt, nil)
 	require.Nil(t, err)
 	if apiTok != "" {
@@ -48,12 +53,12 @@ func req(t *T, method, endpnt, apiTok, userTok string) (int, string) {
 		r.Header.Set(UserTokenHeader, userTok)
 	}
 	w := httptest.NewRecorder()
-	testAPI.ServeHTTP(w, r)
+	api.ServeHTTP(w, r)
 	return w.Code, w.Body.String()
 }
 
 func TestNoAPIToken(t *T) {
-	code, body := req(t, "GET", "/foo", "", "")
+	code, body := req(t, testAPI, "GET", "/foo", "", "")
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "foo\n", body)
 }
@@ -61,15 +66,15 @@ func TestNoAPIToken(t *T) {
 func TestAPIToken(t *T) {
 	apiTok := testAPI.NewAPIToken()
 
-	code, body := req(t, "GET", "/bar", "", "")
+	code, body := req(t, testAPI, "GET", "/bar", "", "")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, APITokenMissing+"\n", body)
 
-	code, body = req(t, "GET", "/bar", "blah blah blah", "")
+	code, body = req(t, testAPI, "GET", "/bar", "blah blah blah", "")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, APITokenInvalid+"\n", body)
 
-	code, body = req(t, "GET", "/bar", apiTok, "")
+	code, body = req(t, testAPI, "GET", "/bar", apiTok, "")
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "bar\n", body)
 }
@@ -79,19 +84,34 @@ func TestUserToken(t *T) {
 	apiTok := testAPI.NewAPIToken()
 	userTok := testAPI.NewUserToken(username)
 
-	code, body := req(t, "GET", "/baz", apiTok, "")
+	code, body := req(t, testAPI, "GET", "/baz", apiTok, "")
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "baz\n", body)
 
-	code, body = req(t, "POST", "/baz", apiTok, "")
+	code, body = req(t, testAPI, "POST", "/baz", apiTok, "")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, UserTokenMissing+"\n", body)
 
-	code, body = req(t, "POST", "/baz", apiTok, "blah blah blah")
+	code, body = req(t, testAPI, "POST", "/baz", apiTok, "blah blah blah")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, UserTokenInvalid+"\n", body)
 
-	code, body = req(t, "POST", "/baz", apiTok, userTok)
+	code, body = req(t, testAPI, "POST", "/baz", apiTok, userTok)
 	assert.Equal(t, 200, code)
 	assert.Equal(t, username+"\n", body)
+}
+
+var testBuiltinAPI = func() *API {
+	o := NewAPIOpts()
+	o.Secret = []byte("turtles")
+	return NewMux(o).(*API)
+}()
+
+func TestBulitinAPIToken(t *T) {
+	code, body := req(t, testBuiltinAPI, "GET", "/token", "", "")
+	t.Log(body)
+	assert.Equal(t, 200, code)
+	s := struct{ Token string }{}
+	assert.Nil(t, json.Unmarshal([]byte(body), &s))
+	assert.NotEqual(t, "", s.Token)
 }

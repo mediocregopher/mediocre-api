@@ -8,10 +8,10 @@ go methods when building your own api.
 
 ## Builtin
 
-There is a builtin REST api which can be used. It is not necessary to use this
-api if you don't wish to, the rest of the package is perfectly usable without
-it. It's simply a nice place to start, and has most of the repetitive user
-"stuff" implemented.
+There is a builtin REST api which can be used (`NewMux`). It is not necessary to
+use this api if you don't wish to, the rest of the package is perfectly usable
+without it. It's simply a nice place to start, and has most of the repetitive
+user "stuff" implemented.
 
 Errors are returned as strings in the body (not json-encoded), with a non-200
 response code. All bodies of 200 responses, if there is a body at all, will be

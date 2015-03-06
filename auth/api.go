@@ -10,6 +10,7 @@ import (
 
 	"github.com/mediocregopher/mediocre-api/auth/apitok"
 	"github.com/mediocregopher/mediocre-api/auth/usertok"
+	"github.com/mediocregopher/mediocre-api/common/apihelper"
 )
 
 // Various error responses this package may return (these will all be appended
@@ -140,7 +141,7 @@ func NewAPI(mux Muxer, o *APIOpts) *API {
 }
 
 // NewAPIToken generates a new api token which will work with the secret this
-// API is using.  Will return empty string if Secret isn't set
+// API is using. Will return empty string if Secret isn't set
 func (a *API) NewAPIToken() string {
 	if a.o.Secret == nil {
 		return ""
@@ -298,4 +299,25 @@ func (a *API) requiresUserAuth(r *http.Request, flags HandlerFlag) bool {
 	}
 
 	return flags&checkFlag != 0
+}
+
+// NewMux returns a new http.Handler which has basic endpoints pre-defined
+// endpoints for interacting with this package. See the package README for more
+// information
+func NewMux(o *APIOpts) http.Handler {
+	m := http.NewServeMux()
+	a := NewAPI(m, o)
+
+	tokenEndpt := "/token"
+	a.SetHandlerFlags(tokenEndpt, IPRateLimited|NoAPITokenRequired)
+	m.HandleFunc(tokenEndpt, func(w http.ResponseWriter, r *http.Request) {
+		if !apihelper.Prepare(w, r, nil, 0, "GET") {
+			return
+		}
+
+		token := a.NewAPIToken()
+		apihelper.JSONSuccess(w, &struct{ Token string }{token})
+	})
+
+	return a
 }
