@@ -26,7 +26,7 @@ type PrivateInfo struct {
 
 func mapToInfo(user string, m map[string]string) (*Info, error) {
 	if len(m) == 0 {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 
 	var i Info
@@ -54,9 +54,6 @@ func respToPrivateInfo(user string, r *redis.Resp) (*PrivateInfo, error) {
 	i, err := mapToInfo(user, m)
 	if err != nil {
 		return nil, err
-	}
-	if i == nil {
-		return nil, nil
 	}
 
 	var pi PrivateInfo

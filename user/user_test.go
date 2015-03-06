@@ -55,11 +55,11 @@ func TestGetNonExistant(t *T) {
 	user := commontest.RandStr()
 
 	i, err := s.Get(user)
-	require.Nil(t, err)
+	assert.Equal(t, ErrNotFound, err)
 	assert.Nil(t, i)
 
 	pi, err := s.GetPrivate(user)
-	require.Nil(t, err)
+	assert.Equal(t, ErrNotFound, err)
 	assert.Nil(t, pi)
 }
 

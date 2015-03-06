@@ -107,4 +107,10 @@ func TestAPIUserGet(t *T) {
 	requireJSONUnmarshal(t, body, &i)
 	assert.Equal(t, i.Name, user)
 	assert.Equal(t, i.Email, email)
+
+	user404 := commontest.RandStr()
+	url = fmt.Sprintf("/%s", user404)
+	code, body = authtest.Req(testAPI, "GET", url, "", "")
+	assert.Equal(t, 404, code)
+	assert.Equal(t, ErrNotFound.Error()+"\n", body)
 }

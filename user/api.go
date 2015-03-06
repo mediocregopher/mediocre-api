@@ -34,7 +34,7 @@ var passwordParam = pickyjson.Str{
 // if it's not nil return an unknown server-side error
 func finalErr(w http.ResponseWriter, r *http.Request, err error) {
 	if eerr, ok := err.(ExpectedErr); ok {
-		http.Error(w, eerr.Error(), 400)
+		http.Error(w, eerr.Error(), eerr.Code)
 		return
 	} else if err != nil {
 		log.Printf("%s %s -> %s", r.Method, r.URL, err)

@@ -15,19 +15,22 @@ import (
 // ExpectedErr is an implementation of the error interface which will be used to
 // indicate that the error being returned is an expected one and can sent back
 // to the client
-type ExpectedErr string
+type ExpectedErr struct {
+	Code int
+	Err  string
+}
 
 // Error implements the error interface
 func (e ExpectedErr) Error() string {
-	return string(e)
+	return e.Err
 }
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserExists = ExpectedErr("user exists")
-	ErrNotFound   = ExpectedErr("user not found")
-	ErrBadAuth    = ExpectedErr("could not authenticate user")
-	ErrDisabled   = ExpectedErr("user account is disabled")
+	ErrUserExists = ExpectedErr{400, "user exists"}
+	ErrNotFound   = ExpectedErr{404, "user not found"}
+	ErrBadAuth    = ExpectedErr{400, "could not authenticate user"}
+	ErrDisabled   = ExpectedErr{400, "user account is disabled"}
 )
 
 // Fields found in the main user hash
@@ -149,14 +152,15 @@ func (s *System) Login(user, password string) (bool, error) {
 	return false, ErrBadAuth
 }
 
-// Get returns the Info for the given user, or nil if the user couldn't be found
+// Get returns the Info for the given user, or ErrNotFound if the user couldn't
+// be found
 func (s *System) Get(user string) (*Info, error) {
 	key := s.Key(user)
 	return respToInfo(user, s.c.Cmd("HGETALL", key))
 }
 
-// GetPrivate returns the PrivateInfo for the given user, or nil if the user
-// couldn't be found
+// GetPrivate returns the PrivateInfo for the given user, or ErrNotFound if the
+// user couldn't be found
 func (s *System) GetPrivate(user string) (*PrivateInfo, error) {
 	key := s.Key(user)
 	return respToPrivateInfo(user, s.c.Cmd("HGETALL", key))
