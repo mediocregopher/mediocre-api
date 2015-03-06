@@ -2,26 +2,37 @@
 package apitok
 
 import (
-	"encoding/json"
+	"encoding/base64"
+	"strconv"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"crypto/rand"
+
 	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
 
-type apiTokData struct {
-	UUID string
-	TS   time.Time
-}
+// TODO actually use the timestamp embedded to invalidate old api keys. Maybe
+// make sig embed a timestamp in all keys
+
+var b64 = base64.StdEncoding
 
 // New returns an api token, signed with the given secret
 func New(secret []byte) string {
-	tok := apiTokData{
-		UUID: uuid.New(),
-		TS:   time.Now(),
+	shared := make([]byte, 16)
+	if _, err := rand.Read(shared); err != nil {
+		panic(err) // should probably do something else here....
 	}
-	d, _ := json.Marshal(tok)
-	return sig.New(d, secret)
+	t := []byte(strconv.FormatInt(time.Now().UnixNano(), 10))
+
+	tl := b64.EncodedLen(len(t))
+	l := tl + b64.EncodedLen(len(shared)) + 1
+
+	data := make([]byte, l)
+	b64.Encode(data, t)
+	data[tl] = ':'
+	b64.Encode(data[tl+1:], shared)
+
+	return sig.New(data, secret)
 }
 
 // RateLimiter implements a token bucket rate limiting system on a per-api-token

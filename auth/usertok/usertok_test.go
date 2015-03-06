@@ -9,13 +9,13 @@ import (
 
 // Returns 10 random slices of bytes
 func randByteSlices() [][]byte {
-	slices := make([][]byte, 0, 10)
-	for range slices {
+	slices := make([][]byte, 10)
+	for i := range slices {
 		b := make([]byte, 50)
 		if _, err := rand.Read(b); err != nil {
 			panic(err)
 		}
-		slices = append(slices, b)
+		slices[i] = b
 	}
 	return slices
 }

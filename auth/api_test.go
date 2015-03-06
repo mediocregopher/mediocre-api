@@ -109,7 +109,6 @@ var testBuiltinAPI = func() *API {
 
 func TestBulitinAPIToken(t *T) {
 	code, body := req(t, testBuiltinAPI, "GET", "/token", "", "")
-	t.Log(body)
 	assert.Equal(t, 200, code)
 	s := struct{ Token string }{}
 	assert.Nil(t, json.Unmarshal([]byte(body), &s))

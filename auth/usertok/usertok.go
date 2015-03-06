@@ -3,41 +3,51 @@
 package usertok
 
 import (
+	"bytes"
 	"crypto/rand"
-	"encoding/json"
+	"encoding/base64"
 
 	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
 
-type userTokData struct {
-	User   string
-	Random []byte
-}
+var b64 = base64.StdEncoding
 
 // New returns a new user token given a user identifying string and a secret
 func New(user string, secret []byte) string {
-	shared := make([]byte, 128)
+	shared := make([]byte, 16)
 	if _, err := rand.Read(shared); err != nil {
 		panic(err) // should probably do something else here....
 	}
+	userB := []byte(user)
 
-	u := userTokData{user, shared}
-	userTokD, _ := json.Marshal(u)
-	return sig.New(userTokD, secret)
+	userL := b64.EncodedLen(len(userB))
+	l := userL + b64.EncodedLen(len(shared)) + 1
+	data := make([]byte, l)
+	b64.Encode(data, userB)
+	data[userL] = ':'
+	b64.Encode(data[userL+1:], shared)
+
+	return sig.New(data, secret)
 }
 
 // ExtractUser takes in a userTok as returned by New() and extracts the user
 // identifier that was passed into New() and returns it. Returns empty string if
 // the user token can't be extracted due to an invalid token
 func ExtractUser(userTok string, secret []byte) string {
-	userTokD := sig.Extract(userTok, secret)
-	if userTokD == nil {
+	data := sig.Extract(userTok, secret)
+	if data == nil {
 		return ""
 	}
 
-	var u userTokData
-	if err := json.Unmarshal(userTokD, &u); err != nil {
+	parts := bytes.SplitN(data, []byte(":"), 2)
+	if len(parts) != 2 {
 		return ""
 	}
-	return u.User
+
+	userB, err := b64.DecodeString(string(parts[0]))
+	if err != nil {
+		return ""
+	}
+
+	return string(userB)
 }
