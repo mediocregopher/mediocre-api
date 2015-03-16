@@ -18,3 +18,6 @@ user authentication). Each part has its own README explaining how to use it
 
 - [user](/user) - User creation/modification/authentication. Also provides a
   basic REST api which can be used and built on
+
+- [xff](/xff) - Middleware for correctly handling `X-Forwarded-For` headers
+  transparently

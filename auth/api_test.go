@@ -46,6 +46,7 @@ func req(
 ) {
 	r, err := http.NewRequest(method, endpnt, nil)
 	require.Nil(t, err)
+	r.RemoteAddr = "1.1.1.1:50000"
 	if apiTok != "" {
 		r.Header.Set(APITokenHeader, apiTok)
 	}

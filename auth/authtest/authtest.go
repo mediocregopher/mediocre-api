@@ -18,6 +18,7 @@ func Req(a *auth.API, method, endpoint, user, body string) (int, string) {
 	if err != nil {
 		panic(err)
 	}
+	r.RemoteAddr = "2.2.2.2:50000"
 
 	r.Header.Set(auth.APITokenHeader, a.NewAPIToken())
 	if user != "" {

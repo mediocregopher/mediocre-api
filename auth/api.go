@@ -6,6 +6,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mediocregopher/mediocre-api/auth/apitok"
@@ -209,7 +210,8 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var token string
 
 	if o.flags&IPRateLimited != 0 {
-		switch a.o.RateLimiter.CanUseRaw(r.RemoteAddr) {
+		remoteIP := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
+		switch a.o.RateLimiter.CanUseRaw(remoteIP) {
 		case apitok.Success:
 			token = r.RemoteAddr
 		case apitok.RateLimited:
