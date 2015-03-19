@@ -34,37 +34,44 @@ func TestCreateGet(t *T) {
 
 	end := time.Now()
 
-	i, err := s.Get(user)
+	i, err := s.Get(user, Public)
 	require.Nil(t, err)
-	assert.Equal(t, user, i.Name)
-	assert.True(t, i.Created.After(start) && i.Created.Before(end))
+	assert.Equal(t, user, i["Name"])
+	assert.Equal(t, "", i["Email"])
+	tsCreated, err := unmarshalTime(i["TSCreated"])
+	require.Nil(t, err)
+	assert.True(t, tsCreated.After(start) && tsCreated.Before(end))
 
-	pi, err := s.GetPrivate(user)
+	pi, err := s.Get(user, Private)
 	require.Nil(t, err)
-	assert.Equal(t, user, pi.Name)
-	assert.True(t, pi.Created.After(start) && pi.Created.Before(end))
+	assert.Equal(t, user, pi["Name"])
+	tsCreated, err = unmarshalTime(pi["TSCreated"])
+	require.Nil(t, err)
+	assert.True(t, tsCreated.After(start) && tsCreated.Before(end))
 	// now the parts not inherited from Info
-	assert.Equal(t, email, pi.Email)
-	assert.Equal(t, false, pi.Verified)
-	assert.True(t, pi.Modified.After(start) && pi.Modified.Before(end))
-	assert.True(t, pi.LastLoggedIn.IsZero())
+	assert.Equal(t, email, pi["Email"])
+	assert.Equal(t, "", pi["Verified"])
+	tsModified, err := unmarshalTime(pi["TSModified"])
+	require.Nil(t, err)
+	assert.True(t, tsModified.After(start) && tsModified.Before(end))
+	tsLastLoggedIn, err := unmarshalTime(pi["TSLastLoggedIn"])
+	require.Nil(t, err)
+	assert.True(t, tsLastLoggedIn.IsZero())
 }
 
 func TestGetNonExistant(t *T) {
 	s := testSystem(t)
 	user := commontest.RandStr()
 
-	i, err := s.Get(user)
+	i, err := s.Get(user, Public)
 	assert.Equal(t, ErrNotFound, err)
 	assert.Nil(t, i)
-
-	pi, err := s.GetPrivate(user)
-	assert.Equal(t, ErrNotFound, err)
-	assert.Nil(t, pi)
 }
 
 func TestInternalSet(t *T) {
 	s := testSystem(t)
+	s.AddField(Field{Name: "foo", FieldFilter: Public})
+	s.AddField(Field{Name: "baz", FieldFilter: Public})
 	user := commontest.RandStr()
 
 	start := time.Now()
@@ -72,8 +79,8 @@ func TestInternalSet(t *T) {
 	require.Nil(t, err)
 	end := time.Now()
 
-	t.Log(s.Key(user))
-	r := s.c.Cmd("HMGET", s.Key(user), tsModifiedField, "foo", "baz", "box")
+	tsModifiedKey := s.fields["TSModified"].Key
+	r := s.c.Cmd("HMGET", s.Key(user), tsModifiedKey, "foo", "baz", "box")
 	l, err := r.List()
 	require.Nil(t, err)
 
@@ -96,7 +103,8 @@ func TestLogin(t *T) {
 	require.True(t, ok)
 	end := time.Now()
 
-	tsls, err := s.c.Cmd("HGET", s.Key(user), tsLastLoggedInField).Str()
+	tsLastLoggedInFieldKey := s.fields["TSLastLoggedIn"].Key
+	tsls, err := s.c.Cmd("HGET", s.Key(user), tsLastLoggedInFieldKey).Str()
 	require.Nil(t, err)
 	tsl, err := unmarshalTime(tsls)
 	require.Nil(t, err)
@@ -115,15 +123,15 @@ func TestVerify(t *T) {
 	s := testSystem(t)
 	user, _, _ := randUser(t, s)
 
-	pi, err := s.GetPrivate(user)
+	pi, err := s.Get(user, Private)
 	require.Nil(t, err)
-	assert.False(t, pi.Verified)
+	assert.Equal(t, "", pi["Verified"])
 
 	require.Nil(t, s.Verify(user))
 
-	pi, err = s.GetPrivate(user)
+	pi, err = s.Get(user, Private)
 	require.Nil(t, err)
-	assert.True(t, pi.Verified)
+	assert.NotEqual(t, "", pi["Verified"])
 }
 
 func TestDisable(t *T) {
@@ -132,9 +140,9 @@ func TestDisable(t *T) {
 
 	require.Nil(t, s.Disable(user))
 
-	pi, err := s.GetPrivate(user)
+	pi, err := s.Get(user, Private)
 	require.Nil(t, err)
-	assert.True(t, pi.Disabled)
+	assert.NotEqual(t, "", pi["Disabled"])
 
 	ok, err := s.Login(user, password)
 	assert.Equal(t, ErrDisabled, err)
@@ -142,9 +150,9 @@ func TestDisable(t *T) {
 
 	require.Nil(t, s.Enable(user))
 
-	pi, err = s.GetPrivate(user)
+	pi, err = s.Get(user, Private)
 	require.Nil(t, err)
-	assert.False(t, pi.Disabled)
+	assert.Equal(t, "", pi["Disabled"])
 
 	ok, err = s.Login(user, password)
 	assert.Nil(t, err)

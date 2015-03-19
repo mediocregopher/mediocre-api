@@ -131,13 +131,11 @@ func handleGet(
 	}
 
 	authUser := a.GetUser(r)
-	var ret interface{}
-	var err error
+	var filter FieldFilter
 	if user == authUser {
-		ret, err = s.GetPrivate(user)
-	} else {
-		ret, err = s.Get(user)
+		filter |= Private
 	}
+	ret, err := s.Get(user, filter)
 
 	if err != nil {
 		finalErr(w, r, err)

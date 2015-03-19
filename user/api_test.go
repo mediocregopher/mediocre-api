@@ -94,19 +94,19 @@ func requireJSONUnmarshal(t *T, body string, i interface{}) {
 func TestAPIUserGet(t *T) {
 	user, email, _ := testAPICreateUser(t)
 	url := fmt.Sprintf("/%s", user)
-	var i PrivateInfo
+	var i Info
 
 	code, body := authtest.Req(testAPI, "GET", url, "", "")
 	assert.Equal(t, 200, code)
 	requireJSONUnmarshal(t, body, &i)
-	assert.Equal(t, i.Name, user)
-	assert.Equal(t, i.Email, "")
+	assert.Equal(t, user, i["Name"])
+	assert.Equal(t, "", i["Email"])
 
 	code, body = authtest.Req(testAPI, "GET", url, user, "")
 	assert.Equal(t, 200, code)
 	requireJSONUnmarshal(t, body, &i)
-	assert.Equal(t, i.Name, user)
-	assert.Equal(t, i.Email, email)
+	assert.Equal(t, user, i["Name"])
+	assert.Equal(t, email, i["Email"])
 
 	user404 := commontest.RandStr()
 	url = fmt.Sprintf("/%s", user404)
