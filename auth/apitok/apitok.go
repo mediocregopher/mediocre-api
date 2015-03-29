@@ -11,9 +11,6 @@ import (
 	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
 
-// TODO actually use the timestamp embedded to invalidate old api keys. Maybe
-// make sig embed a timestamp in all keys
-
 var b64 = base64.StdEncoding
 
 // New returns an api token, signed with the given secret
@@ -32,7 +29,7 @@ func New(secret []byte) string {
 	data[tl] = ':'
 	b64.Encode(data[tl+1:], shared)
 
-	return sig.New(data, secret)
+	return sig.New(data, secret, 3*time.Hour)
 }
 
 // RateLimiter implements a token bucket rate limiting system on a per-api-token

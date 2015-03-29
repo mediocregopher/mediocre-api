@@ -92,6 +92,9 @@ The api token is the basis of rate-limiting in most cases. All requests by
 default require an api key to be set on the header `X-API-TOKEN`, which must be
 retrieved from the api itself.
 
+**API tokens are only valid for 3 hours. The application must expect this and
+get a new one periodically**
+
 ### Rate-Limiting
 
 Rate limiting is based on a time bucket system. You can read more about it in
@@ -113,6 +116,9 @@ a user token from the api, which authenticates the user however it wants and
 returns a token generated through `NewUserToken`. This token must be included
 with any requests that require user authentication as the `X-USER-TOKEN` header.
 The api may retrieve the authenticated user identifier using `GetUser`.
+
+**User tokens are only valid for 2 days. The application must expect this and
+get a new one periodically**
 
 ## Builtin
 

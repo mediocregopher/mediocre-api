@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"time"
 
 	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
@@ -27,7 +28,7 @@ func New(user string, secret []byte) string {
 	data[userL] = ':'
 	b64.Encode(data[userL+1:], shared)
 
-	return sig.New(data, secret)
+	return sig.New(data, secret, 48*time.Hour)
 }
 
 // ExtractUser takes in a userTok as returned by New() and extracts the user
