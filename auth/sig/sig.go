@@ -3,6 +3,7 @@ package sig
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
 	"strings"
@@ -32,6 +33,17 @@ func New(data, secret []byte, timeout time.Duration) string {
 	expires64 := base64.StdEncoding.EncodeToString(expiresB)
 	data64 := base64.StdEncoding.EncodeToString(data)
 	return data64 + ":" + expires64 + ":" + sum64
+}
+
+// NewRand is the same as New except that the input data is automatically
+// randomly generated
+func NewRand(secret []byte, timeout time.Duration) string {
+	r := make([]byte, 16)
+	if _, err := rand.Read(r); err != nil {
+		panic(err) // should probably do something else here....
+	}
+
+	return New(r, secret, 3*time.Hour)
 }
 
 // Extract extracts the encoded, signed data in the given sig. Returns nil if

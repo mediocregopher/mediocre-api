@@ -2,34 +2,14 @@
 package apitok
 
 import (
-	"encoding/base64"
-	"strconv"
 	"time"
-
-	"crypto/rand"
 
 	"github.com/mediocregopher/mediocre-api/auth/sig"
 )
 
-var b64 = base64.StdEncoding
-
 // New returns an api token, signed with the given secret
 func New(secret []byte) string {
-	shared := make([]byte, 16)
-	if _, err := rand.Read(shared); err != nil {
-		panic(err) // should probably do something else here....
-	}
-	t := []byte(strconv.FormatInt(time.Now().UnixNano(), 10))
-
-	tl := b64.EncodedLen(len(t))
-	l := tl + b64.EncodedLen(len(shared)) + 1
-
-	data := make([]byte, l)
-	b64.Encode(data, t)
-	data[tl] = ':'
-	b64.Encode(data[tl+1:], shared)
-
-	return sig.New(data, secret, 3*time.Hour)
+	return sig.NewRand(secret, 3*time.Hour)
 }
 
 // RateLimiter implements a token bucket rate limiting system on a per-api-token
