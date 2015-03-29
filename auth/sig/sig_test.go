@@ -29,9 +29,15 @@ func TestSig(t *T) {
 			sig := New(datas[i], secrets[j], 5*time.Millisecond)
 			data := Extract(sig, secrets[j])
 			assert.Equal(t, string(datas[i]), string(data), "secret: %v", secrets[j])
+
 			// Check that timeout works as well
 			time.Sleep(5 * time.Millisecond)
 			assert.Nil(t, Extract(sig, secrets[j]), "secret: %v", secrets[j])
+
+			// Check that sigs without timeouts also work
+			sig = New(datas[i], secrets[j], 0)
+			data = Extract(sig, secrets[j])
+			assert.Equal(t, string(datas[i]), string(data), "secret: %v", secrets[j])
 		}
 	}
 }

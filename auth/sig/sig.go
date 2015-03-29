@@ -10,10 +10,19 @@ import (
 )
 
 // New returns a string which is a combination of the given data and a signature
-// of the given data, signed by the given secret
+// of the given data, signed by the given secret. The signed data is only valid
+// for the given duration, unless the given duration is 0 in which case it is
+// valid forever.
 func New(data, secret []byte, timeout time.Duration) string {
-	expires := time.Now().Add(timeout)
-	expiresB, _ := expires.MarshalBinary()
+	var expires time.Time
+	if timeout > 0 {
+		expires = time.Now().UTC().Add(timeout)
+	}
+	expiresB, err := expires.MarshalBinary()
+	if err != nil {
+		// This shouldn't really be a thing that happens
+		panic(err)
+	}
 
 	h := hmac.New(sha1.New, secret)
 	h.Write(data)
@@ -26,7 +35,7 @@ func New(data, secret []byte, timeout time.Duration) string {
 }
 
 // Extract extracts the encoded, signed data in the given sig. Returns nil if
-// the data can't be decoded or verified
+// the data can't be decoded, verified, or has timedout
 func Extract(sig string, secret []byte) []byte {
 	i := strings.IndexByte(sig, ':')
 	if i < 0 {
@@ -55,7 +64,7 @@ func Extract(sig string, secret []byte) []byte {
 	if err = expires.UnmarshalBinary(expiresB); err != nil {
 		return nil
 	}
-	if time.Now().After(expires) {
+	if !expires.IsZero() && time.Now().After(expires) {
 		return nil
 	}
 

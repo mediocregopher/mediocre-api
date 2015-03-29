@@ -117,9 +117,6 @@ returns a token generated through `NewUserToken`. This token must be included
 with any requests that require user authentication as the `X-USER-TOKEN` header.
 The api may retrieve the authenticated user identifier using `GetUser`.
 
-**User tokens are only valid for 2 days. The application must expect this and
-get a new one periodically**
-
 ## Builtin
 
 There is a builtin REST api which can be used (`NewMux`). It is not necessary to
