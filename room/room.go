@@ -7,9 +7,6 @@ import (
 	"time"
 
 	"github.com/mediocregopher/mediocre-api/common"
-	"github.com/mediocregopher/radix.v2/cluster"
-	"github.com/mediocregopher/radix.v2/pool"
-	"github.com/mediocregopher/radix.v2/redis"
 	"github.com/mediocregopher/radix.v2/util"
 )
 
@@ -114,27 +111,11 @@ func (s *System) spin() {
 func (s *System) removeIdle() error {
 	expire := time.Now().UTC().Add(-s.o.CheckInPeriod).UnixNano()
 	ch := make(chan string)
+
 	var err error
-	if c, ok := s.c.(*cluster.Cluster); ok {
-		go func() {
-			err = util.ScanCluster(c, ch, s.Key("*"))
-		}()
-	} else if p, ok := s.c.(*pool.Pool); ok {
-		c, err := p.Get()
-		if err != nil {
-			return err
-		}
-		go func() {
-			err = util.Scan(c, ch, "SCAN", "", s.Key("*"))
-		}()
-		p.Put(c)
-	} else if c, ok := s.c.(*redis.Client); ok {
-		go func() {
-			err = util.Scan(c, ch, "SCAN", "", s.Key("*"))
-		}()
-	} else {
-		panic("unknown Cmder passed in, sorry :(")
-	}
+	go func() {
+		err = util.Scan(s.c, ch, "SCAN", "", s.Key("*"))
+	}()
 
 	for key := range ch {
 		// TODO We can't report an error from here unfortunately. That's
