@@ -32,11 +32,11 @@ func assertRoomMembers(t *T, s *System, room string, members ...string) {
 		mFound[l[i]] = true
 	}
 
-	assert.Equal(t, mExpect, mFound, string(debug.Stack()))
+	assert.Equal(t, mExpect, mFound, "room: %s stack: %s", room, string(debug.Stack()))
 
 	c, err := s.Cardinality(room)
 	require.Nil(t, err)
-	assert.Equal(t, len(mExpect), c, string(debug.Stack()))
+	assert.Equal(t, len(mExpect), c, "room: %s stack: %s", room, string(debug.Stack()))
 }
 
 func TestCheckIn(t *T) {
@@ -97,8 +97,10 @@ func TestLeave(t *T) {
 	assertRoomMembers(t, s, room2, user2)
 	assertRoomMembers(t, s, room3, user3)
 
-	// Wait another half second, make sure automatic cleanup is working
+	// Wait another half second, make sure automatic cleanup is working, force
+	// it to run since we're running just on the edge here
 	time.Sleep(500 * time.Millisecond)
+	require.Nil(t, s.removeIdle())
 	assertRoomMembers(t, s, room1)
 	assertRoomMembers(t, s, room2, user2)
 	assertRoomMembers(t, s, room3)
