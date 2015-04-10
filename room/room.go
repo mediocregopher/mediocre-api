@@ -6,13 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/radix.v2/util"
 )
 
 // System holds on to a Cmder and uses it to implement a basic room system
 type System struct {
-	c      common.Cmder
+	c      util.Cmder
 	o      *Opts
 	stopCh chan struct{}
 }
@@ -34,7 +33,7 @@ type Opts struct {
 // New returns a new System which will use the given Cmder as its persistence
 // layer. The passed in Opts may be used to modify behavior of the System, or
 // may be nil to just use the defaults
-func New(c common.Cmder, o *Opts) *System {
+func New(c util.Cmder, o *Opts) *System {
 	if o == nil {
 		o = &Opts{}
 	}

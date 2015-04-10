@@ -8,13 +8,13 @@ import (
 	"fmt"
 
 	"github.com/mediocregopher/mediocre-api/auth"
-	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/radix.v2/pool"
+	"github.com/mediocregopher/radix.v2/util"
 )
 
 // APIStarterKit returns a populated APIOpts and a Cmder which can be used as
 // generic entities for testing
-func APIStarterKit() (*auth.APIOpts, common.Cmder) {
+func APIStarterKit() (*auth.APIOpts, util.Cmder) {
 	p, err := pool.New("tcp", "localhost:6379", 10)
 	if err != nil {
 		panic(err)

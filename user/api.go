@@ -6,10 +6,10 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/mediocregopher/mediocre-api/auth"
-	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/common/apihelper"
 	"github.com/mediocregopher/mediocre-api/pickyjson"
 	"github.com/mediocregopher/mediocre-api/rend"
+	"github.com/mediocregopher/radix.v2/util"
 )
 
 // Body size limit for this module is very low, we're not dealing with large
@@ -55,7 +55,7 @@ var userHandlerFuncs = map[string]userHandlerFunc{
 // NewMux returns a new http.Handler (in reality a http.ServeMux wrapped with an
 // auth.API) which has the basic suite of user creation/modification endpoints.
 // See the package README for more information
-func NewMux(o *auth.APIOpts, c common.Cmder) http.Handler {
+func NewMux(o *auth.APIOpts, c util.Cmder) http.Handler {
 	m := http.NewServeMux()
 	a := auth.NewAPI(m, o)
 	s := New(c)

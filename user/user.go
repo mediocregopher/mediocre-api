@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/radix.v2/redis"
+	"github.com/mediocregopher/radix.v2/util"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -84,7 +84,7 @@ type Info map[string]string
 // * Disabled (private)
 // * PasswordHash (hidden)
 type System struct {
-	c common.Cmder
+	c util.Cmder
 
 	// The cost parameter to use when creating new password hashes. This
 	// defaults to 11 and can be set right after instantiation
@@ -95,7 +95,7 @@ type System struct {
 
 // New returns a new System which will use the given Cmder as its persistence
 // layer
-func New(c common.Cmder) *System {
+func New(c util.Cmder) *System {
 	s := System{
 		c:          c,
 		BCryptCost: 11,
