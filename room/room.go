@@ -21,7 +21,8 @@ type System struct {
 type Opts struct {
 
 	// Prefix can be used if you wish to have two separate room systems being
-	// persisted on the same Cmder. Prefix will be prepended to all key names
+	// persisted on the same Cmder. Prefix will be part of a string prepended to
+	// all key names
 	Prefix string
 
 	// CheckInPeriod indicates how long a user has to check in to a room before
