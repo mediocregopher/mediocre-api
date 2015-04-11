@@ -43,7 +43,7 @@ func NewRand(secret []byte, timeout time.Duration) string {
 		panic(err) // should probably do something else here....
 	}
 
-	return New(r, secret, 3*time.Hour)
+	return New(r, secret, timeout)
 }
 
 // Extract extracts the encoded, signed data in the given sig. Returns nil if
