@@ -6,6 +6,7 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/mediocregopher/mediocre-api/auth"
+	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/common/apihelper"
 	"github.com/mediocregopher/mediocre-api/pickyjson"
 	"github.com/mediocregopher/mediocre-api/rend"
@@ -33,7 +34,7 @@ var passwordParam = pickyjson.Str{
 // If err is an expected error return it to the client as a 400 error. Otherwise
 // if it's not nil return an unknown server-side error
 func finalErr(w http.ResponseWriter, r *http.Request, err error) {
-	if eerr, ok := err.(ExpectedErr); ok {
+	if eerr, ok := err.(common.ExpectedErr); ok {
 		http.Error(w, eerr.Error(), eerr.Code)
 		return
 	} else if err != nil {
