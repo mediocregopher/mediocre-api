@@ -16,8 +16,9 @@ func testSystem(t *T) *System {
 	p, err := pool.New("tcp", "localhost:6379", 10)
 	require.Nil(t, err)
 
-	s := New(p, []byte("TURTLES"))
+	s := New(p)
 	s.AlivenessPeriod = 1
+	s.Secret = []byte("TURTLES")
 	return s
 }
 

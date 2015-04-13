@@ -67,7 +67,10 @@ var delEqual = `
 type System struct {
 	c util.Cmder
 	*room.System
-	secret []byte
+
+	// When set a signature will be generated for broadcast IDs which can be
+	// used to authenticate that they are legitimate
+	Secret []byte
 
 	// Prefix can be filled in on a System returned from New, and is used as
 	// part of a prefix on all keys used by this system. Useful if you want to
@@ -80,12 +83,10 @@ type System struct {
 	AlivenessPeriod int
 }
 
-// New returns a new initialized system. The secret will be used to sign
-// broadcast ids for users actually creating a broadcast.
-func New(c util.Cmder, secret []byte) *System {
+// New returns a new initialized system
+func New(c util.Cmder) *System {
 	return &System{
 		c:               c,
-		secret:          secret,
 		AlivenessPeriod: 30,
 	}
 }
@@ -111,7 +112,7 @@ func (id ID) User() string {
 // NewID returns a new broadcast ID for the given user, along with a signature
 // which can verify that the holder of the id is the true owner. This method
 // makes no database changes, see StartBroadcast if that's what you're looking
-// for
+// for. The signature will be empty string if Secret is not set on the System
 func (s *System) NewID(user string) (ID, string) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
@@ -121,22 +122,29 @@ func (s *System) NewID(user string) (ID, string) {
 	id := user + ":" + benc
 	id64 := base64.StdEncoding.EncodeToString([]byte(id))
 
-	h := hmac.New(sha1.New, s.secret)
-	h.Write([]byte(id))
-	sig := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	var sig string
+
+	if s.Secret != nil {
+		h := hmac.New(sha1.New, s.Secret)
+		h.Write([]byte(id))
+		sig = base64.StdEncoding.EncodeToString(h.Sum(nil))
+	}
 
 	return ID(id64), sig
 }
 
 // Verify returns wheither or not the given sig is the valid signature for the
 // given ID, i.e. they were both returned from the same call to NewID or
-// StartBroadcast
+// StartBroadcast. Returns false if Secret is not set on the System
 func (s *System) Verify(id ID, sig string) bool {
+	if s.Secret == nil {
+		return false
+	}
 	idDec, err := base64.StdEncoding.DecodeString(string(id))
 	if err != nil {
 		return false
 	}
-	h := hmac.New(sha1.New, s.secret)
+	h := hmac.New(sha1.New, s.Secret)
 	h.Write(idDec)
 	realSig := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return realSig == sig
@@ -149,7 +157,8 @@ func (s *System) userKey(user string) string {
 
 // StartBroadcast returns a unique broadcast id for the user to use, and the
 // signature for that id which can be used to verify they are the real
-// broadcaster. This will error if the user is already broadcasting
+// broadcaster. The signature will be empty string if Secret is not set on the
+// System. This will error if the user is already broadcasting
 func (s *System) StartBroadcast(user string) (ID, string, error) {
 	id, sig := s.NewID(user)
 	ukey := s.userKey(user)
