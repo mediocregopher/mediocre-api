@@ -1,7 +1,6 @@
 package user
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/asaskevich/govalidator"
@@ -29,19 +28,6 @@ var emailParam = pickyjson.Str{
 var passwordParam = pickyjson.Str{
 	MinLength: 6,
 	MaxLength: 255,
-}
-
-// If err is an expected error return it to the client as a 400 error. Otherwise
-// if it's not nil return an unknown server-side error
-func finalErr(w http.ResponseWriter, r *http.Request, err error) {
-	if eerr, ok := err.(common.ExpectedErr); ok {
-		http.Error(w, eerr.Error(), eerr.Code)
-		return
-	} else if err != nil {
-		log.Printf("%s %s -> %s", r.Method, r.URL, err)
-		http.Error(w, "unknown server-side error", 500)
-		return
-	}
 }
 
 type userHandlerFunc func(
@@ -74,7 +60,7 @@ func NewMux(o *auth.APIOpts, c util.Cmder) http.Handler {
 		}
 
 		err := s.Create(j.Username.Str, j.Email.Str, j.Password.Str)
-		finalErr(w, r, err)
+		common.HTTPError(w, r, err)
 	})
 
 	// All other requests will match this, meaning one should be of the form
@@ -114,7 +100,7 @@ func handleToken(
 	// login only succeeds without an error
 	_, err := s.Login(user, j.Password.Str)
 	if err != nil {
-		finalErr(w, r, err)
+		common.HTTPError(w, r, err)
 		return
 	}
 
@@ -139,7 +125,7 @@ func handleGet(
 	ret, err := s.Get(user, filter)
 
 	if err != nil {
-		finalErr(w, r, err)
+		common.HTTPError(w, r, err)
 	} else {
 		apihelper.JSONSuccess(w, &ret)
 	}
