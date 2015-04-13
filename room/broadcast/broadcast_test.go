@@ -76,7 +76,7 @@ func TestStillAlive(t *T) {
 	time.Sleep(500 * time.Millisecond)
 	assertUserBroadcastID(t, s, user, "")
 
-	assert.Equal(t, errBroadcastEnded, s.StillAlive(id))
+	assert.Equal(t, ErrBroadcastEnded, s.StillAlive(id))
 }
 
 func TestEndBroadcast(t *T) {
@@ -89,7 +89,7 @@ func TestEndBroadcast(t *T) {
 	require.Nil(t, s.EndBroadcast(id))
 	assertUserBroadcastID(t, s, user, "")
 
-	assert.Equal(t, errBroadcastEnded, s.EndBroadcast(id))
+	assert.Equal(t, ErrBroadcastEnded, s.EndBroadcast(id))
 }
 
 func TestExpireEqual(t *T) {

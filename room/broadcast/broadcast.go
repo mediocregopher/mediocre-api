@@ -17,7 +17,6 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
-	"errors"
 	"strings"
 
 	"github.com/mediocregopher/mediocre-api/common"
@@ -29,12 +28,8 @@ import (
 // Errors which can be expected from various methods in this package
 var (
 	ErrUserIsBroadcasting = common.ExpectedErr{400, "user already broadcasting"}
-)
-
-// Errors which should not happen unless there is a bug somewhere
-var (
-	errInvalidID      = errors.New("invalid broadcast.ID")
-	errBroadcastEnded = errors.New("broadcast already ended")
+	ErrInvalidID          = common.ExpectedErr{400, "invalid broadcast.ID"}
+	ErrBroadcastEnded     = common.ExpectedErr{400, "broadcast already ended"}
 )
 
 // EXPIREEQUAL KEY SECONDS VALUE
@@ -177,7 +172,7 @@ func (s *System) StartBroadcast(user string) (ID, string, error) {
 func (s *System) StillAlive(id ID) error {
 	user := id.User()
 	if user == "" {
-		return errInvalidID
+		return ErrInvalidID
 	}
 	key := s.userKey(user)
 	i, err := util.LuaEval(s.c, expireEqual, 1, key, s.AlivenessPeriod, string(id)).Int()
@@ -185,7 +180,7 @@ func (s *System) StillAlive(id ID) error {
 		return err
 	}
 	if i == 0 {
-		return errBroadcastEnded
+		return ErrBroadcastEnded
 	}
 	return nil
 }
@@ -195,7 +190,7 @@ func (s *System) StillAlive(id ID) error {
 func (s *System) EndBroadcast(id ID) error {
 	user := id.User()
 	if user == "" {
-		return errInvalidID
+		return ErrInvalidID
 	}
 	key := s.userKey(user)
 
@@ -204,7 +199,7 @@ func (s *System) EndBroadcast(id ID) error {
 		return err
 	}
 	if i == 0 {
-		return errBroadcastEnded
+		return ErrBroadcastEnded
 	}
 	return nil
 }
@@ -226,7 +221,7 @@ func (s *System) GetBroadcastID(user string) (ID, error) {
 	if id.User() != user {
 		// This isn't expected to happen, but I'd like to enforce that any ID
 		// returned from this package is a valid one
-		return "", errInvalidID
+		return "", ErrInvalidID
 	}
 	return id, nil
 }
