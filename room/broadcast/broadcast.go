@@ -92,7 +92,7 @@ type ID string
 
 // User returns the name of the user encoded into the id
 func (id ID) User() string {
-	idDec, err := base64.StdEncoding.DecodeString(string(id))
+	idDec, err := base64.URLEncoding.DecodeString(string(id))
 	if err != nil {
 		return ""
 	}
@@ -113,16 +113,16 @@ func (s *System) NewID(user string) (ID, string) {
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
-	benc := base64.StdEncoding.EncodeToString(b)
+	benc := base64.URLEncoding.EncodeToString(b)
 	id := user + ":" + benc
-	id64 := base64.StdEncoding.EncodeToString([]byte(id))
+	id64 := base64.URLEncoding.EncodeToString([]byte(id))
 
 	var sig string
 
 	if s.Secret != nil {
 		h := hmac.New(sha1.New, s.Secret)
 		h.Write([]byte(id))
-		sig = base64.StdEncoding.EncodeToString(h.Sum(nil))
+		sig = base64.URLEncoding.EncodeToString(h.Sum(nil))
 	}
 
 	return ID(id64), sig
@@ -135,13 +135,13 @@ func (s *System) Verify(id ID, sig string) bool {
 	if s.Secret == nil {
 		return false
 	}
-	idDec, err := base64.StdEncoding.DecodeString(string(id))
+	idDec, err := base64.URLEncoding.DecodeString(string(id))
 	if err != nil {
 		return false
 	}
 	h := hmac.New(sha1.New, s.Secret)
 	h.Write(idDec)
-	realSig := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	realSig := base64.URLEncoding.EncodeToString(h.Sum(nil))
 	return realSig == sig
 }
 
