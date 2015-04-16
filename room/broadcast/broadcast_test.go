@@ -79,17 +79,17 @@ func TestStillAlive(t *T) {
 	assert.Equal(t, ErrBroadcastEnded, s.StillAlive(id))
 }
 
-func TestEndBroadcast(t *T) {
+func TestEnded(t *T) {
 	s := testSystem(t)
 	user := commontest.RandStr()
 	id, _, err := s.StartBroadcast(user)
 	require.Nil(t, err)
 
 	assertUserBroadcastID(t, s, user, id)
-	require.Nil(t, s.EndBroadcast(id))
+	require.Nil(t, s.Ended(id))
 	assertUserBroadcastID(t, s, user, "")
 
-	assert.Equal(t, ErrBroadcastEnded, s.EndBroadcast(id))
+	assert.Equal(t, ErrBroadcastEnded, s.Ended(id))
 }
 
 func TestExpireEqual(t *T) {

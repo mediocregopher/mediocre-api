@@ -185,9 +185,9 @@ func (s *System) StillAlive(id ID) error {
 	return nil
 }
 
-// End records that a broadcast has ended and that the user is no longer
+// Ended records that a broadcast has ended and that the user is no longer
 // broadcasting
-func (s *System) EndBroadcast(id ID) error {
+func (s *System) Ended(id ID) error {
 	user := id.User()
 	if user == "" {
 		return ErrInvalidID
