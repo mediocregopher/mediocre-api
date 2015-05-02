@@ -285,7 +285,7 @@ func NewMux(secret []byte) (http.Handler, *API) {
 	m.Handle("/token", a.WrapHandlerFunc(
 		IPRateLimited,
 		func(w http.ResponseWriter, r *http.Request) {
-			if !apihelper.Prepare(w, r, nil, 0, "GET") {
+			if !apihelper.Prepare(w, r, nil, 0) {
 				return
 			}
 

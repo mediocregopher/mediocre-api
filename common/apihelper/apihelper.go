@@ -40,12 +40,8 @@ func ErrUnlessMethod(
 //
 func Prepare(
 	w http.ResponseWriter, r *http.Request, params interface{},
-	bodySizeLimit int64, methods ...string,
+	bodySizeLimit int64,
 ) bool {
-	if len(methods) > 0 && ErrUnlessMethod(w, r, methods...) {
-		return false
-	}
-
 	r.Body = http.MaxBytesReader(w, r.Body, bodySizeLimit)
 	if params != nil {
 		if err := json.NewDecoder(r.Body).Decode(params); err != nil {
