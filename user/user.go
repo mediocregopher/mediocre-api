@@ -17,10 +17,10 @@ import (
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserExists = common.ExpectedErr{400, "user exists"}
-	ErrNotFound   = common.ExpectedErr{404, "user not found"}
-	ErrBadAuth    = common.ExpectedErr{400, "could not authenticate user"}
-	ErrDisabled   = common.ExpectedErr{400, "user account is disabled"}
+	ErrUserExists = common.ExpectedErr{Code: 400, Err: "user exists"}
+	ErrNotFound   = common.ExpectedErr{Code: 404, Err: "user not found"}
+	ErrBadAuth    = common.ExpectedErr{Code: 400, Err: "could not authenticate user"}
+	ErrDisabled   = common.ExpectedErr{Code: 400, Err: "user account is disabled"}
 )
 
 // FieldFilter is used to describe a filter which can be used when retrieving

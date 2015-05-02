@@ -27,9 +27,9 @@ import (
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserIsBroadcasting = common.ExpectedErr{400, "user already broadcasting"}
-	ErrInvalidID          = common.ExpectedErr{400, "invalid broadcast.ID"}
-	ErrBroadcastEnded     = common.ExpectedErr{400, "broadcast already ended"}
+	ErrUserIsBroadcasting = common.ExpectedErr{Code: 400, Err: "user already broadcasting"}
+	ErrInvalidID          = common.ExpectedErr{Code: 400, Err: "invalid broadcast.ID"}
+	ErrBroadcastEnded     = common.ExpectedErr{Code: 400, Err: "broadcast already ended"}
 )
 
 // EXPIREEQUAL KEY SECONDS VALUE
