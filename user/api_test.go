@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"runtime/debug"
 	. "testing"
 
@@ -13,8 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testAPI = func() *auth.API {
-	return NewMux(commontest.APIStarterKit()).(*auth.API)
+var testAPI, testMux = func() (*auth.API, http.Handler) {
+	api, cmder := commontest.APIStarterKit()
+	return api, NewMux(api, cmder)
 }()
 
 func testAPICreateUser(t *T) (string, string, string) {
@@ -29,7 +31,7 @@ func testAPICreateUser(t *T) (string, string, string) {
 		password,
 	)
 
-	code, body := authtest.Req(testAPI, "POST", "/new-user", "", reqBody)
+	code, body := authtest.Req(testAPI, testMux, "POST", "/new-user", "", reqBody)
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "", body)
 	return user, email, password
@@ -42,7 +44,7 @@ func TestAPINewUser(t *T) {
 
 	// Sanity check to make sure required parameters are being checked
 	// correctly, we don't need to do this for all tests though
-	code, body := authtest.Req(testAPI, "POST", "/new-user", "",
+	code, body := authtest.Req(testAPI, testMux, "POST", "/new-user", "",
 		fmt.Sprintf(
 			`{"Username":"%s","Password":"%s"}`,
 			user,
@@ -59,11 +61,11 @@ func TestAPINewUser(t *T) {
 		password,
 	)
 
-	code, body = authtest.Req(testAPI, "POST", "/new-user", "", reqBody)
+	code, body = authtest.Req(testAPI, testMux, "POST", "/new-user", "", reqBody)
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "", body)
 
-	code, body = authtest.Req(testAPI, "POST", "/new-user", "", reqBody)
+	code, body = authtest.Req(testAPI, testMux, "POST", "/new-user", "", reqBody)
 	assert.Equal(t, 400, code)
 	assert.Equal(t, ErrUserExists.Error()+"\n", body)
 }
@@ -75,12 +77,12 @@ func TestAPIUserToken(t *T) {
 	url := fmt.Sprintf("/%s/token", user)
 
 	reqBody := `{"Password":"aaaaaa"}`
-	code, body := authtest.Req(testAPI, "GET", url, "", reqBody)
+	code, body := authtest.Req(testAPI, testMux, "GET", url, "", reqBody)
 	assert.Equal(t, 400, code)
 	assert.Equal(t, ErrBadAuth.Error()+"\n", body)
 
 	reqBody = fmt.Sprintf(`{"Password":"%s"}`, password)
-	code, body = authtest.Req(testAPI, "GET", url, "", reqBody)
+	code, body = authtest.Req(testAPI, testMux, "GET", url, "", reqBody)
 	assert.Equal(t, 200, code)
 	s := struct{ Token string }{}
 	assert.Nil(t, json.Unmarshal([]byte(body), &s))
@@ -96,13 +98,13 @@ func TestAPIUserGet(t *T) {
 	url := fmt.Sprintf("/%s", user)
 	var i Info
 
-	code, body := authtest.Req(testAPI, "GET", url, "", "")
+	code, body := authtest.Req(testAPI, testMux, "GET", url, "", "")
 	assert.Equal(t, 200, code)
 	requireJSONUnmarshal(t, body, &i)
 	assert.Equal(t, user, i["Name"])
 	assert.Equal(t, "", i["Email"])
 
-	code, body = authtest.Req(testAPI, "GET", url, user, "")
+	code, body = authtest.Req(testAPI, testMux, "GET", url, user, "")
 	assert.Equal(t, 200, code)
 	requireJSONUnmarshal(t, body, &i)
 	assert.Equal(t, user, i["Name"])
@@ -110,7 +112,7 @@ func TestAPIUserGet(t *T) {
 
 	user404 := commontest.RandStr()
 	url = fmt.Sprintf("/%s", user404)
-	code, body = authtest.Req(testAPI, "GET", url, "", "")
+	code, body = authtest.Req(testAPI, testMux, "GET", url, "", "")
 	assert.Equal(t, 404, code)
 	assert.Equal(t, ErrNotFound.Error()+"\n", body)
 }

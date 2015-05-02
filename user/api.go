@@ -39,12 +39,11 @@ var userHandlerFuncs = map[string]userHandlerFunc{
 	"token": handleToken,
 }
 
-// NewMux returns a new http.Handler (in reality a http.ServeMux wrapped with an
-// auth.API) which has the basic suite of user creation/modification endpoints.
-// See the package README for more information
-func NewMux(o *auth.APIOpts, c util.Cmder) http.Handler {
+// NewMux returns a new http.Handler (in reality a http.ServeMux) which has the
+// basic suite of user creation/modification endpoints. See the package README
+// for more information
+func NewMux(a *auth.API, c util.Cmder) http.Handler {
 	m := http.NewServeMux()
-	a := auth.NewAPI(m, o)
 	s := New(c)
 
 	m.HandleFunc("/new-user", func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +80,7 @@ func NewMux(o *auth.APIOpts, c util.Cmder) http.Handler {
 		f(s, a, w, r, user)
 	})
 
-	return a
+	return m
 }
 
 // Handles the retrieval of a user token

@@ -10,10 +10,14 @@ import (
 	"github.com/mediocregopher/mediocre-api/auth"
 )
 
-// Req performs a request on the given API instance, returning the return http
-// code and body. If user is not empty a user token will be automatically
+// Req performs a request on the given API/mux instances, returning the return
+// http code and body. If user is not empty a user token will be automatically
 // created
-func Req(a *auth.API, method, endpoint, user, body string) (int, string) {
+func Req(
+	a *auth.API, mux http.Handler, method, endpoint, user, body string,
+) (
+	int, string,
+) {
 	r, err := http.NewRequest(method, endpoint, bytes.NewBufferString(body))
 	if err != nil {
 		panic(err)
@@ -26,6 +30,6 @@ func Req(a *auth.API, method, endpoint, user, body string) (int, string) {
 	}
 
 	w := httptest.NewRecorder()
-	a.ServeHTTP(w, r)
+	mux.ServeHTTP(w, r)
 	return w.Code, w.Body.String()
 }

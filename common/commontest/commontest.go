@@ -12,17 +12,17 @@ import (
 	"github.com/mediocregopher/radix.v2/util"
 )
 
-// APIStarterKit returns a populated APIOpts and a Cmder which can be used as
+// APIStarterKit returns an initialized *API and a Cmder which can be used as
 // generic entities for testing
-func APIStarterKit() (*auth.APIOpts, util.Cmder) {
+func APIStarterKit() (*auth.API, util.Cmder) {
 	p, err := pool.New("tcp", "localhost:6379", 10)
 	if err != nil {
 		panic(err)
 	}
 
-	o := auth.NewAPIOpts()
-	o.Secret = []byte("SHOOPDAWOOP")
-	return o, p
+	a := auth.NewAPI()
+	a.Secret = []byte("SHOOPDAWOOP")
+	return a, p
 }
 
 // RandStr returns a string of random alphanumeric characters

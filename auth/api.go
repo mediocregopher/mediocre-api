@@ -1,6 +1,6 @@
-// Package auth wraps around an http multiplexer (e.g. http.ServeMux), providing
-// automatic rate-limiting and user authentication. See the package README for
-// more documentation and examples
+// Package auth wraps around an http.Handler, providing automatic rate-limiting
+// and user authentication. See the package README for more documentation and
+// examples
 package auth
 
 import (
@@ -33,29 +33,14 @@ const (
 	UserTokenHeader = "X-USER-TOKEN"
 )
 
-// A Muxer is set up with strings (e.g. "/foo", "/") which it will subsequently
-// match incoming requests to and under normal circumstances execute the
-// http.Handler for those requests. http.ServeMux is an example of a Muxer.
-type Muxer interface {
-
-	// Handler returns the handler to use for the given request. If the path is
-	// not in its canonical form, the handler will be an internally-generated
-	// handler that redirects to the canonical path.
-	//
-	// Handler also returns the registered pattern that matches the request or,
-	// in the case of internally-generated redirects, the pattern that will
-	// match after following the redirect.
-	//
-	// If there is no registered handler that applies to the request, Handler
-	// returns a “page not found” handler and an empty pattern.
-	Handler(*http.Request) (http.Handler, string)
-}
-
-// HandlerFlag is used to set options on a particular handler (see
-// SetHandlerFlags)
+// HandlerFlag is used to set options on a particular handler
 type HandlerFlag int
 
 const (
+	// An endpoint with Default has no flags set. It will rate-limit the client
+	// based on their api token, and that is all.
+	Default = 0
+
 	// IPRateLimited sets the endpoint as being rate-limited by IP instead of by
 	// api token.  Should be used sparingly (preferably only on the endpoint
 	// which doles out the api tokens)
@@ -97,57 +82,39 @@ type handlerOpt struct {
 
 var blankHandlerOpt handlerOpt
 
-// APIOpts describe all the user set-able modifications which can be made to the
-// behavior of API. A default APIOpts is returned by NewAPIOpts, and fields on
-// it can be modified before being passed into NewAPI
-type APIOpts struct {
+// API can return an http.Handler which wraps around
+// another http.Handler, providing automatic rate-limiting and user
+// authentication
+type API struct {
 
 	// Contains the rate limiting implementation. The fields on the RateLimiter
-	// can be changed prior to API actually serving requests
+	// can be changed prior to actually serving requests (generally before
+	// ListenAndServe is called)
 	RateLimiter *apitok.RateLimiter
 
 	// The secret used when signing data for rate limiting and user
-	// authentication tokens. If this is null rate-limiting will be disabled and
-	// any endpoints needing user authentication will return a 500 error
+	// authentication tokens. If this is nil rate-limiting will be disabled and
+	// any endpoints needing user authentication will return a 500 error.
+	// Defaults to nil
 	Secret []byte
 }
 
-// NewAPIOpts returns the default APIOpts struct, the fields on which can be
-// changed in order to modify behavior before being passed into NewAPI
-func NewAPIOpts() *APIOpts {
-	return &APIOpts{
+// NewAPI returns an API with all of its fields initialized to their default
+// values. Any of the fields may be modified before actually serving requests
+// (generally before ListenAndServe is called)
+func NewAPI() *API {
+	return &API{
 		RateLimiter: apitok.NewRateLimiter(),
 	}
 }
 
-// API is an http.Handler which wraps a given Muxer, providing automatic
-// rate-limiting and user authentication
-type API struct {
-	mux         Muxer
-	handlerOpts map[string]*handlerOpt
-	o           *APIOpts
-}
-
-// NewAPI takes in a Muxer and returns an API which wraps around it. If the
-// given APIOpts is nil the default will be used
-func NewAPI(mux Muxer, o *APIOpts) *API {
-	if o == nil {
-		o = NewAPIOpts()
-	}
-	return &API{
-		mux:         mux,
-		handlerOpts: map[string]*handlerOpt{},
-		o:           o,
-	}
-}
-
-// NewAPIToken generates a new api token which will work with the secret this
+// NewAPIToken generates a new api token which will work with the Secret this
 // API is using. Will return empty string if Secret isn't set
 func (a *API) NewAPIToken() string {
-	if a.o.Secret == nil {
+	if a.Secret == nil {
 		return ""
 	}
-	return apitok.New(a.o.Secret)
+	return apitok.New(a.Secret)
 }
 
 // GetAPIToken returns the api token as sent by the client. Will return empty
@@ -160,58 +127,59 @@ func (a *API) GetAPIToken(r *http.Request) string {
 // can later be retrieved from the token using GetUser). Will return empty
 // string if Secret isn't set
 func (a *API) NewUserToken(user string) string {
-	if a.o.Secret == nil {
+	if a.Secret == nil {
 		return ""
 	}
-	return usertok.New(user, a.o.Secret)
+	return usertok.New(user, a.Secret)
 }
 
 // GetUser returns the user identifier held by the user token from the given
 // request. Returns empty string if the user token header isn't set or invalid,
 // or if Secret isn't set
 func (a *API) GetUser(r *http.Request) string {
-	if a.o.Secret == nil {
+	if a.Secret == nil {
 		return ""
 	}
 	userTok := r.Header.Get(UserTokenHeader)
 	if userTok == "" {
 		return ""
 	}
-	return usertok.ExtractUser(userTok, a.o.Secret)
+	return usertok.ExtractUser(userTok, a.Secret)
 }
 
-func (a *API) getHandlerOpt(pattern string) *handlerOpt {
-	if _, ok := a.handlerOpts[pattern]; !ok {
-		a.handlerOpts[pattern] = &handlerOpt{}
+type authHandler struct {
+	api     *API
+	handler http.Handler
+	flags   HandlerFlag
+}
+
+// WrapHandler returns an http.Handler which will process a request according to
+// the flags passed in, then, assuming all checks pass, passes the request on to
+// the given http.Handler
+func (a *API) WrapHandler(flags HandlerFlag, h http.Handler) http.Handler {
+	return &authHandler{
+		api:     a,
+		handler: h,
+		flags:   flags,
 	}
-	return a.handlerOpts[pattern]
 }
 
-// SetHandlerFlags sets option flags on the given endpoint pattern
-func (a *API) SetHandlerFlags(pattern string, flags HandlerFlag) {
-	o := a.getHandlerOpt(pattern)
-	o.flags = flags
+// WrapHandlerFunc is similar to WrapHandler except that it takes in a
+// HandlerFunc
+func (a *API) WrapHandlerFunc(flags HandlerFlag, hf http.HandlerFunc) http.Handler {
+	return a.WrapHandler(flags, hf)
 }
 
-// Implements ServeHTTP for the http.Handler interface. This will ensure the
-// request meets all the requirements it needs to (rate-limit, user tokens,
-// etc...) then gets the real handler from calling Handler on mux and passes the
-// request off to that
-func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	handler, pattern := a.mux.Handler(r)
-	o, ok := a.handlerOpts[pattern]
-	if !ok {
-		o = &blankHandlerOpt
-	}
-
-	// This could be the X-API-TOKEN or the IP, depending a flag in handlerOpts.
-	// If it's left empty we won't bother calling Use on it at the end of the
-	// query
+func (ah *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// This could be the X-API-TOKEN or the IP, depending on flags If it's left
+	// empty we won't bother calling Use on it at the end of the query
 	var token string
 
-	if o.flags&IPRateLimited != 0 {
+	secret := ah.api.Secret
+
+	if ah.flags&IPRateLimited != 0 {
 		remoteIP := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
-		switch a.o.RateLimiter.CanUseRaw(remoteIP) {
+		switch ah.api.RateLimiter.CanUseRaw(remoteIP) {
 		case apitok.Success:
 			token = r.RemoteAddr
 		case apitok.RateLimited:
@@ -225,14 +193,14 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// We only rate limit by api token if we aren't rate limiting by ip
-	} else if o.flags&NoAPITokenRequired == 0 && a.o.Secret != nil {
-		apiToken := a.GetAPIToken(r)
+	} else if ah.flags&NoAPITokenRequired == 0 && secret != nil {
+		apiToken := ah.api.GetAPIToken(r)
 		if apiToken == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, APITokenMissing)
 			return
 		}
-		switch a.o.RateLimiter.CanUse(apiToken, a.o.Secret) {
+		switch ah.api.RateLimiter.CanUse(apiToken, secret) {
 		case apitok.Success:
 			token = apiToken
 		case apitok.TokenInvalid:
@@ -250,8 +218,8 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if a.requiresUserAuth(r, o.flags) {
-		if a.o.Secret == nil {
+	if ah.requiresUserAuth(r) {
+		if secret == nil {
 			w.WriteHeader(500)
 			fmt.Fprintf(w, SecretNotSet)
 			return
@@ -264,7 +232,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if usertok.ExtractUser(userTok, a.o.Secret) == "" {
+		if usertok.ExtractUser(userTok, secret) == "" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, UserTokenInvalid)
 			return
@@ -272,16 +240,16 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	handler.ServeHTTP(w, r)
+	ah.handler.ServeHTTP(w, r)
 
 	if token != "" {
 		elapsed := time.Since(start)
-		a.o.RateLimiter.Use(token, elapsed)
+		ah.api.RateLimiter.Use(token, elapsed)
 	}
 }
 
-func (a *API) requiresUserAuth(r *http.Request, flags HandlerFlag) bool {
-	if flags&RequireUserAuthAlways == RequireUserAuthAlways {
+func (ah *authHandler) requiresUserAuth(r *http.Request) bool {
+	if ah.flags&RequireUserAuthAlways == RequireUserAuthAlways {
 		return true
 	}
 	var checkFlag HandlerFlag
@@ -300,26 +268,31 @@ func (a *API) requiresUserAuth(r *http.Request, flags HandlerFlag) bool {
 		return false
 	}
 
-	return flags&checkFlag != 0
+	return ah.flags&checkFlag != 0
 }
 
 // NewMux returns a new http.Handler which has basic endpoints pre-defined
-// endpoints for interacting with this package. See the package README for more
-// information
-func NewMux(o *APIOpts) http.Handler {
+// endpoints for interacting with this package. It also returns the *API which
+// is being used, so that its parameters may be changed before actually serving
+// requests (e.g. setting a new rate limiter). The Secret field on API will be
+// set automatically by the one passed into this function. See the package
+// README for more information
+func NewMux(secret []byte) (http.Handler, *API) {
 	m := http.NewServeMux()
-	a := NewAPI(m, o)
+	a := NewAPI()
+	a.Secret = secret
 
-	tokenEndpt := "/token"
-	a.SetHandlerFlags(tokenEndpt, IPRateLimited|NoAPITokenRequired)
-	m.HandleFunc(tokenEndpt, func(w http.ResponseWriter, r *http.Request) {
-		if !apihelper.Prepare(w, r, nil, 0, "GET") {
-			return
-		}
+	m.Handle("/token", a.WrapHandlerFunc(
+		IPRateLimited,
+		func(w http.ResponseWriter, r *http.Request) {
+			if !apihelper.Prepare(w, r, nil, 0, "GET") {
+				return
+			}
 
-		token := a.NewAPIToken()
-		apihelper.JSONSuccess(w, &struct{ Token string }{token})
-	})
+			token := a.NewAPIToken()
+			apihelper.JSONSuccess(w, &struct{ Token string }{token})
+		},
+	))
 
-	return a
+	return m, a
 }

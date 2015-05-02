@@ -12,29 +12,34 @@ import (
 )
 
 var testAPI, testMux = func() (*API, *http.ServeMux) {
-	secret := []byte("wubalubadubdub!")
 	s := http.NewServeMux()
-	o := NewAPIOpts()
-	o.Secret = secret
-	a := NewAPI(s, o)
+	a := NewAPI()
+	a.Secret = []byte("wubalubadubdub!")
 
-	a.SetHandlerFlags("/foo", NoAPITokenRequired)
-	s.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "foo")
-	})
+	s.Handle("/foo", a.WrapHandlerFunc(
+		NoAPITokenRequired,
+		func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "foo")
+		},
+	))
 
-	s.HandleFunc("/bar", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "bar")
-	})
+	s.Handle("/bar", a.WrapHandlerFunc(
+		Default,
+		func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "bar")
+		},
+	))
 
-	a.SetHandlerFlags("/baz", RequireUserAuthPost)
-	s.HandleFunc("/baz", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			fmt.Fprintln(w, a.GetUser(r))
-		} else {
-			fmt.Fprintln(w, "baz")
-		}
-	})
+	s.Handle("/baz", a.WrapHandlerFunc(
+		RequireUserAuthPost,
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "POST" {
+				fmt.Fprintln(w, a.GetUser(r))
+			} else {
+				fmt.Fprintln(w, "baz")
+			}
+		},
+	))
 
 	return a, s
 }()
@@ -59,7 +64,7 @@ func req(
 }
 
 func TestNoAPIToken(t *T) {
-	code, body := req(t, testAPI, "GET", "/foo", "", "")
+	code, body := req(t, testMux, "GET", "/foo", "", "")
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "foo\n", body)
 }
@@ -67,15 +72,15 @@ func TestNoAPIToken(t *T) {
 func TestAPIToken(t *T) {
 	apiTok := testAPI.NewAPIToken()
 
-	code, body := req(t, testAPI, "GET", "/bar", "", "")
+	code, body := req(t, testMux, "GET", "/bar", "", "")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, APITokenMissing+"\n", body)
 
-	code, body = req(t, testAPI, "GET", "/bar", "blah blah blah", "")
+	code, body = req(t, testMux, "GET", "/bar", "blah blah blah", "")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, APITokenInvalid+"\n", body)
 
-	code, body = req(t, testAPI, "GET", "/bar", apiTok, "")
+	code, body = req(t, testMux, "GET", "/bar", apiTok, "")
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "bar\n", body)
 }
@@ -85,31 +90,30 @@ func TestUserToken(t *T) {
 	apiTok := testAPI.NewAPIToken()
 	userTok := testAPI.NewUserToken(username)
 
-	code, body := req(t, testAPI, "GET", "/baz", apiTok, "")
+	code, body := req(t, testMux, "GET", "/baz", apiTok, "")
 	assert.Equal(t, 200, code)
 	assert.Equal(t, "baz\n", body)
 
-	code, body = req(t, testAPI, "POST", "/baz", apiTok, "")
+	code, body = req(t, testMux, "POST", "/baz", apiTok, "")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, UserTokenMissing+"\n", body)
 
-	code, body = req(t, testAPI, "POST", "/baz", apiTok, "blah blah blah")
+	code, body = req(t, testMux, "POST", "/baz", apiTok, "blah blah blah")
 	assert.Equal(t, 400, code)
 	assert.Equal(t, UserTokenInvalid+"\n", body)
 
-	code, body = req(t, testAPI, "POST", "/baz", apiTok, userTok)
+	code, body = req(t, testMux, "POST", "/baz", apiTok, userTok)
 	assert.Equal(t, 200, code)
 	assert.Equal(t, username+"\n", body)
 }
 
-var testBuiltinAPI = func() *API {
-	o := NewAPIOpts()
-	o.Secret = []byte("turtles")
-	return NewMux(o).(*API)
+var testBuiltinAPI, testBuiltinMux = func() (*API, http.Handler) {
+	m, a := NewMux([]byte("turtles"))
+	return a, m
 }()
 
 func TestBulitinAPIToken(t *T) {
-	code, body := req(t, testBuiltinAPI, "GET", "/token", "", "")
+	code, body := req(t, testBuiltinMux, "GET", "/token", "", "")
 	assert.Equal(t, 200, code)
 	s := struct{ Token string }{}
 	assert.Nil(t, json.Unmarshal([]byte(body), &s))
