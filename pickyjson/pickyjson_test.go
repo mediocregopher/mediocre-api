@@ -48,7 +48,7 @@ func TestInt64(t *T) {
 	i := Int64{}
 	require.Equal(t, ErrTooSmall, unmarshal(`-1`, &i))
 	require.Nil(t, unmarshal(`4`, &i))
-	require.Equal(t, 4, i.Int64)
+	require.Equal(t, int64(4), i.Int64)
 
 	i = Int64{
 		Max: 10,
@@ -57,7 +57,7 @@ func TestInt64(t *T) {
 	require.Equal(t, ErrTooSmall, unmarshal(`1`, &i))
 	require.Equal(t, ErrTooBig, unmarshal(`11`, &i))
 	require.Nil(t, unmarshal(`4`, &i))
-	require.Equal(t, 4, i.Int64)
+	require.Equal(t, int64(4), i.Int64)
 
 	i = Int64{
 		Min: -5,
@@ -65,9 +65,9 @@ func TestInt64(t *T) {
 	require.Equal(t, ErrTooSmall, unmarshal(`-6`, &i))
 	require.Equal(t, ErrTooBig, unmarshal(`1`, &i))
 	require.Nil(t, unmarshal(`0`, &i))
-	require.Equal(t, 0, i.Int64)
+	require.Equal(t, int64(0), i.Int64)
 	require.Nil(t, unmarshal(`-5`, &i))
-	require.Equal(t, -5, i.Int64)
+	require.Equal(t, int64(-5), i.Int64)
 
 	i = Int64{
 		Func: func(ii int64) bool {
@@ -76,7 +76,7 @@ func TestInt64(t *T) {
 	}
 	require.Equal(t, ErrMalformed, unmarshal(`1`, &i))
 	require.Nil(t, unmarshal(`2`, &i))
-	require.Equal(t, 2, i.Int64)
+	require.Equal(t, int64(2), i.Int64)
 }
 
 func TestCheckRequired(t *T) {

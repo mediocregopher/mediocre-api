@@ -26,7 +26,7 @@ func TestUnmarshalResp(t *T) {
 		"ee": 7,
 	})
 	require.Nil(t, UnmarshalResp(r, &f))
-	assert.Equal(t, 5, f.A)
+	assert.Equal(t, int64(5), f.A)
 	assert.Equal(t, 6, f.B)
 	assert.Equal(t, []byte("hello"), f.C)
 	assert.Equal(t, "world", f.D)
@@ -64,7 +64,7 @@ func TestUnmarshalRespInner(t *T) {
 		},
 	})
 	require.Nil(t, UnmarshalResp(r, &f))
-	assert.Equal(t, 5, f.A)
+	assert.Equal(t, int64(5), f.A)
 	assert.Equal(t, "hello", f.B.Foo)
 	assert.Equal(t, "world", f.C.Bar)
 	assert.Equal(t, "again", f.D.Baz)
@@ -78,7 +78,7 @@ func TestUnmarshalRespInner(t *T) {
 		"Baz": "again",
 	})
 	require.Nil(t, UnmarshalResp(r, &f))
-	assert.Equal(t, 5, f.A)
+	assert.Equal(t, int64(5), f.A)
 	assert.Equal(t, "hello", f.B.Foo)
 	assert.Equal(t, "world", f.C.Bar)
 	assert.Equal(t, "again", f.D.Baz)

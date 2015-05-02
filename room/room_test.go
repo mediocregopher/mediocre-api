@@ -36,7 +36,7 @@ func assertRoomMembers(t *T, s *System, room string, members ...string) {
 
 	c, err := s.Cardinality(room)
 	require.Nil(t, err)
-	assert.Equal(t, len(mExpect), c, "room: %s stack: %s", room, string(debug.Stack()))
+	assert.Equal(t, int64(len(mExpect)), c, "room: %s stack: %s", room, string(debug.Stack()))
 }
 
 func TestCheckIn(t *T) {

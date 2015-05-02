@@ -27,7 +27,7 @@ func TestUserTok(t *T) {
 	for _, user := range users {
 		for _, secret := range secrets {
 			userTok := New(string(user), secret)
-			assert.Equal(t, user, ExtractUser(userTok, secret))
+			assert.Equal(t, string(user), ExtractUser(userTok, secret))
 		}
 	}
 }
