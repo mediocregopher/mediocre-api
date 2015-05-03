@@ -21,3 +21,5 @@ user authentication). Each part has its own README explaining how to use it
 
 - [xff](/xff) - Middleware for correctly handling `X-Forwarded-For` headers
   transparently
+
+- [fwd](/fwd) - Middleware for forwarding requests to other HTTP endpoints
