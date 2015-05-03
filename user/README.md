@@ -1,4 +1,4 @@
-# user
+# mediocre-api/user
 
 [![GoDoc](https://godoc.org/github.com/mediocregopher/mediocre-api/user?status.svg)](https://godoc.org/github.com/mediocregopher/mediocre-api/user)
 

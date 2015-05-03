@@ -1,4 +1,4 @@
-# room
+# mediocre-api/room
 
 [![GoDoc](https://godoc.org/github.com/mediocregopher/mediocre-api/room?status.svg)](https://godoc.org/github.com/mediocregopher/mediocre-api/room)
 
