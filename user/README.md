@@ -59,7 +59,6 @@ or, if authed as the user being requested, this:
     "Name":"The username of the user",
     "Create":"Time string of when the user was created",
     "Email":"The user's primary email",
-    "LastLoggedIn":"Time string of the last time the user logged in",
     "Modified":"Time string of the last time any field was modified",
     "Disabled": false // Whether or not the account is disabled
 }

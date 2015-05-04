@@ -69,8 +69,7 @@ func NewMux(a *auth.API, c util.Cmder) http.Handler {
 			}
 
 			// login only succeeds without an error
-			_, err := s.Login(user, j.Password.Str)
-			if err != nil {
+			if err := s.Authenticate(user, j.Password.Str); err != nil {
 				common.HTTPError(w, r, err)
 				return
 			}

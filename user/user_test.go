@@ -53,9 +53,6 @@ func TestCreateGet(t *T) {
 	tsModified, err := unmarshalTime(pi["TSModified"])
 	require.Nil(t, err)
 	assert.True(t, tsModified.After(start) && tsModified.Before(end))
-	tsLastLoggedIn, err := unmarshalTime(pi["TSLastLoggedIn"])
-	require.Nil(t, err)
-	assert.True(t, tsLastLoggedIn.IsZero())
 }
 
 func TestGetNonExistant(t *T) {
@@ -122,30 +119,33 @@ func TestInternalSetExists(t *T) {
 
 }
 
-func TestLogin(t *T) {
+func TestAuthenticate(t *T) {
 	s := testSystem(t)
 	user, _, password := randUser(t, s)
 
-	start := time.Now()
-	ok, err := s.Login(user, password)
+	err := s.Authenticate(user, password)
 	require.Nil(t, err)
-	require.True(t, ok)
-	end := time.Now()
 
-	tsLastLoggedInFieldKey := s.fields["TSLastLoggedIn"].Key
-	tsls, err := s.c.Cmd("HGET", s.Key(user), tsLastLoggedInFieldKey).Str()
-	require.Nil(t, err)
-	tsl, err := unmarshalTime(tsls)
-	require.Nil(t, err)
-	assert.True(t, tsl.After(start) && tsl.Before(end))
-
-	ok, err = s.Login(user, password+"bogus")
+	err = s.Authenticate(user, password+"bogus")
 	assert.Equal(t, ErrBadAuth, err)
-	assert.False(t, ok)
 
-	ok, err = s.Login(user+"bogus", password)
+	err = s.Authenticate(user+"bogus", password)
 	assert.Equal(t, ErrNotFound, err)
-	assert.False(t, ok)
+}
+
+func TestChangePassword(t *T) {
+	s := testSystem(t)
+	user, _, password := randUser(t, s)
+
+	newPassword := commontest.RandStr()
+	err := s.ChangePassword(user, newPassword)
+	require.Nil(t, err)
+
+	err = s.Authenticate(user, password)
+	assert.Equal(t, ErrBadAuth, err)
+
+	err = s.Authenticate(user, newPassword)
+	assert.Nil(t, err)
 }
 
 func TestDisable(t *T) {
@@ -158,9 +158,8 @@ func TestDisable(t *T) {
 	require.Nil(t, err)
 	assert.NotEqual(t, "", pi["Disabled"])
 
-	ok, err := s.Login(user, password)
+	err = s.Authenticate(user, password)
 	assert.Equal(t, ErrDisabled, err)
-	assert.False(t, ok)
 
 	require.Nil(t, s.Enable(user))
 
@@ -168,9 +167,8 @@ func TestDisable(t *T) {
 	require.Nil(t, err)
 	assert.Equal(t, "", pi["Disabled"])
 
-	ok, err = s.Login(user, password)
+	err = s.Authenticate(user, password)
 	assert.Nil(t, err)
-	assert.True(t, ok)
 }
 
 func TestSet(t *T) {

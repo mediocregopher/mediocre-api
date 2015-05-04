@@ -1,10 +1,12 @@
 // Package user implements an abstraction for a basic user system. Users can be
 // created, have properties set on them, disabled, deleted, and more. All data
 // is persisted to a redis instance or cluster, and all methods are compeletely
-// thread-safe. No data is sanitized by this package
+// thread-safe. No data is sanitized by this package, and no authentication is
+// done (although authentication mechanisims are provided)
 package user
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -93,7 +95,6 @@ type Info map[string]string
 // * Name
 // * TSCreated
 // * Email (private, editable)
-// * TSLastLoggedIn (private)
 // * TSModified (private)
 // * Disabled (private)
 // * PasswordHash (hidden)
@@ -118,7 +119,6 @@ func New(c util.Cmder) *System {
 	s.AddField(Field{"Name", "_n", Public})
 	s.AddField(Field{"TSCreated", "_t", Public})
 	s.AddField(Field{"Email", "_e", Private | Editable})
-	s.AddField(Field{"TSLastLoggedIn", "_tl", Private})
 	s.AddField(Field{"TSModified", "_tm", Private})
 	s.AddField(Field{"Disabled", "_d", Private})
 	s.AddField(Field{"PasswordHash", "_p", Hidden})
@@ -179,7 +179,7 @@ func (s *System) Create(user, email, password string) error {
 		return ErrUserExists
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.BCryptCost)
+	hash, err := s.generatePassword(password)
 	if err != nil {
 		return err
 	}
@@ -193,6 +193,24 @@ func (s *System) Create(user, email, password string) error {
 	}
 
 	return nil
+}
+
+func (s *System) generatePassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.BCryptCost)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash), nil
+}
+
+// ChangePassword changes an existing user's password to be the given one
+func (s *System) ChangePassword(user, newPassword string) error {
+	hash, err := s.generatePassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	return s.setExists(user, "PasswordHash", hash)
 }
 
 func (s *System) set(user string, keyvals ...interface{}) error {
@@ -267,7 +285,9 @@ func (s *System) unset(user string, fields ...string) error {
 	return s.c.Cmd("HDEL", s.Key(user), keys).Err
 }
 
-func (s *System) checkPassword(user, password string) error {
+// Authenticate attempts to authenticate the user with the given password.
+// Returns nil on success. Can return ErrDisabled or ErrBadAuth
+func (s *System) Authenticate(user, password string) error {
 	u, err := s.Get(user, Hidden|Private)
 	if err != nil {
 		return err
@@ -277,27 +297,16 @@ func (s *System) checkPassword(user, password string) error {
 		return ErrDisabled
 	}
 
-	p := u["PasswordHash"]
+	p, err := hex.DecodeString(u["PasswordHash"])
+	if err != nil {
+		return err
+	}
+
 	match := bcrypt.CompareHashAndPassword([]byte(p), []byte(password)) == nil
 	if !match {
 		return ErrBadAuth
 	}
 	return nil
-}
-
-// Login attempts to authenticate the user with the given password. If the
-// password matches the one in the db then tsLastLoggedIn is updated on the user
-// hash. Returns whether or not the user successfully logged in
-//
-// If this method returns true it may still return an error if updating
-// lastLoggedIn failed. In reality only errors accompanied by a false really
-// matter
-func (s *System) Login(user, password string) (bool, error) {
-	err := s.checkPassword(user, password)
-	if err != nil {
-		return false, err
-	}
-	return true, s.set(user, "TSLastLoggedIn", marshalTime(time.Now()))
 }
 
 func (s *System) getFromResp(r *redis.Resp, filters FieldFlag) (Info, error) {
