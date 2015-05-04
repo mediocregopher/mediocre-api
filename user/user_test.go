@@ -50,7 +50,6 @@ func TestCreateGet(t *T) {
 	assert.True(t, tsCreated.After(start) && tsCreated.Before(end))
 	// now the parts not inherited from Info
 	assert.Equal(t, email, pi["Email"])
-	assert.Equal(t, "", pi["Verified"])
 	tsModified, err := unmarshalTime(pi["TSModified"])
 	require.Nil(t, err)
 	assert.True(t, tsModified.After(start) && tsModified.Before(end))
@@ -147,21 +146,6 @@ func TestLogin(t *T) {
 	ok, err = s.Login(user+"bogus", password)
 	assert.Equal(t, ErrNotFound, err)
 	assert.False(t, ok)
-}
-
-func TestVerify(t *T) {
-	s := testSystem(t)
-	user, _, _ := randUser(t, s)
-
-	pi, err := s.Get(user, Private)
-	require.Nil(t, err)
-	assert.Equal(t, "", pi["Verified"])
-
-	require.Nil(t, s.Verify(user))
-
-	pi, err = s.Get(user, Private)
-	require.Nil(t, err)
-	assert.NotEqual(t, "", pi["Verified"])
 }
 
 func TestDisable(t *T) {

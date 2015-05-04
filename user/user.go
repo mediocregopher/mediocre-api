@@ -1,7 +1,7 @@
 // Package user implements an abstraction for a basic user system. Users can be
-// created, verified, have properties set on them, disabled, deleted, and more.
-// All data is persisted to a redis instance or cluster, and all methods are
-// compeletely thread-safe. No data is sanitized by this package
+// created, have properties set on them, disabled, deleted, and more. All data
+// is persisted to a redis instance or cluster, and all methods are compeletely
+// thread-safe. No data is sanitized by this package
 package user
 
 import (
@@ -101,7 +101,6 @@ type Info map[string]string
 // * Name
 // * TSCreated
 // * Email (private, editable)
-// * Verified (private)
 // * TSLastLoggedIn (private)
 // * TSModified (private)
 // * Disabled (private)
@@ -127,7 +126,6 @@ func New(c util.Cmder) *System {
 	s.AddField(Field{"Name", "_n", Public})
 	s.AddField(Field{"TSCreated", "_t", Public})
 	s.AddField(Field{"Email", "_e", Private | Editable})
-	s.AddField(Field{"Verified", "_v", Private})
 	s.AddField(Field{"TSLastLoggedIn", "_tl", Private})
 	s.AddField(Field{"TSModified", "_tm", Private})
 	s.AddField(Field{"Disabled", "_d", Private})
@@ -335,12 +333,6 @@ func (s *System) getFromResp(r *redis.Resp, filters FieldFlag) (Info, error) {
 func (s *System) Get(user string, filters FieldFlag) (Info, error) {
 	key := s.Key(user)
 	return s.getFromResp(s.c.Cmd("HGETALL", key), filters)
-}
-
-// Verify marks the user as having been "verified", either through email or
-// other means
-func (s *System) Verify(user string) error {
-	return s.set(user, "Verified", "1")
 }
 
 // Disable marks the user as being disabled, meaning they have effectively
