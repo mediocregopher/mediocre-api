@@ -177,42 +177,24 @@ func TestSet(t *T) {
 	s := testSystem(t)
 	s.AddField(Field{Name: "foo", Flags: Public})
 	s.AddField(Field{Name: "bar", Flags: Public | Editable})
-	s.AddField(Field{Name: "baz", Flags: Public | EditableWithPassword})
 
 	userDNE := commontest.RandStr()
-	err := s.Set(userDNE, "", false, Info{"foo": "foo", "bar": "bar"})
+	err := s.Set(userDNE, Info{"foo": "foo", "bar": "bar"})
 	assert.Equal(t, ErrFieldUneditable("foo"), err)
 
-	err = s.Set(userDNE, "", false, Info{"bar": "bar"})
+	err = s.Set(userDNE, Info{"bar": "bar"})
 	assert.Equal(t, ErrNotFound, err)
 
-	err = s.Set(userDNE, "", false, Info{"bar": "bar", "baz": "baz"})
-	assert.Equal(t, ErrFieldRequiresPassword("baz"), err)
-
-	err = s.Set(userDNE, "", true, Info{"bar": "bar", "baz": "baz"})
-	assert.Equal(t, ErrNotFound, err)
-
-	user, _, password := randUser(t, s)
-	err = s.Set(user, "", false, Info{"bar": "bar"})
+	user, _, _ := randUser(t, s)
+	err = s.Set(user, Info{"bar": "bar"})
 	require.Nil(t, err)
 	u, err := s.Get(user, Public)
 	require.Nil(t, err)
 	assert.Equal(t, "bar", u["bar"])
 
-	err = s.Set(user, "WRONG", false, Info{"bar": "bar1", "baz": "baz1"})
-	assert.Equal(t, ErrBadAuth, err)
-
-	err = s.Set(user, password, false, Info{"bar": "bar1", "baz": "baz1"})
+	err = s.Set(user, Info{"bar": "bar1"})
 	require.Nil(t, err)
 	u, err = s.Get(user, Public)
 	require.Nil(t, err)
 	assert.Equal(t, "bar1", u["bar"])
-	assert.Equal(t, "baz1", u["baz"])
-
-	err = s.Set(user, "WRONG", true, Info{"bar": "bar2", "baz": "baz2"})
-	require.Nil(t, err)
-	u, err = s.Get(user, Public)
-	require.Nil(t, err)
-	assert.Equal(t, "bar2", u["bar"])
-	assert.Equal(t, "baz2", u["baz"])
 }

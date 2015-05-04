@@ -31,9 +31,6 @@ var (
 	ErrFieldUneditable = func(f string) error {
 		return common.ExpectedErrf(400, "field %q not editable", f)
 	}
-	ErrFieldRequiresPassword = func(f string) error {
-		return common.ExpectedErrf(400, "field %q requries password to edit", f)
-	}
 )
 
 // HMSETXX key fieldWhichExists field value [field value...]
@@ -68,11 +65,6 @@ const (
 
 	// Editable indicates that this field is allowed to be modified manually
 	Editable
-
-	// EditableWithPassword indicates that this field is allowed to be modified
-	// manually, but only if the correct password for the user has been given as
-	// well
-	EditableWithPassword
 )
 
 // Field is a struct which describes a single field of a user map. A field's
@@ -104,7 +96,7 @@ type Info map[string]string
 // * TSLastLoggedIn (private)
 // * TSModified (private)
 // * Disabled (private)
-// * PasswordHash (hidden, editable with password)
+// * PasswordHash (hidden)
 type System struct {
 	c util.Cmder
 
@@ -129,7 +121,7 @@ func New(c util.Cmder) *System {
 	s.AddField(Field{"TSLastLoggedIn", "_tl", Private})
 	s.AddField(Field{"TSModified", "_tm", Private})
 	s.AddField(Field{"Disabled", "_d", Private})
-	s.AddField(Field{"PasswordHash", "_p", Hidden | EditableWithPassword})
+	s.AddField(Field{"PasswordHash", "_p", Hidden})
 	return &s
 }
 
@@ -351,13 +343,8 @@ func (s *System) Enable(user string) error {
 
 // Set is used to manually modify a user's fields. The Info argument need only
 // be filled with the fields which are desired to be changed. All fields given
-// in that argument must be either Editable or EditableWithPassword. If any have
-// EditableWithPassword then the user's current password must be passed in,
-// otherwise an empty string may be passed in instead. If ignoreAuth is set to
-// true than the password does not need to be given, even if some fields are
-// EditableWithPassword
-func (s *System) Set(user, password string, ignoreAuth bool, i Info) error {
-	var checkPassword bool
+// in that argument must be Editable.
+func (s *System) Set(user string, i Info) error {
 	keyvals := make([]interface{}, 0, len(i)*2)
 	for fieldName, value := range i {
 		flags := s.fields[fieldName].Flags
@@ -365,26 +352,11 @@ func (s *System) Set(user, password string, ignoreAuth bool, i Info) error {
 		if flags == 0 {
 			return ErrFieldUnknown(fieldName)
 
-		} else if flags&EditableWithPassword > 0 {
-			if !ignoreAuth {
-				if password == "" {
-					return ErrFieldRequiresPassword(fieldName)
-				}
-				checkPassword = true
-			}
-
 		} else if flags&Editable == 0 {
 			return ErrFieldUneditable(fieldName)
 		}
 
 		keyvals = append(keyvals, fieldName, value)
-	}
-
-	if checkPassword {
-		err := s.checkPassword(user, password)
-		if err != nil {
-			return err
-		}
 	}
 
 	return s.setExists(user, keyvals...)
