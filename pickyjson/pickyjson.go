@@ -90,7 +90,7 @@ func (s Str) Required() Str {
 	return s
 }
 
-// Int is a wrapper for a normal go int64, but with extra constraints. If a
+// Int64 is a wrapper for a normal go int64, but with extra constraints. If a
 // constraint is not specified it will not be applied
 type Int64 struct {
 	// Maximum and minimum values that the integer may be

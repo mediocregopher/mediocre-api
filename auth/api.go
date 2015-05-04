@@ -37,8 +37,8 @@ const (
 type HandlerFlag int
 
 const (
-	// An endpoint with Default has no flags set. It will rate-limit the client
-	// based on their api token, and that is all.
+	// Default means no flags are set on an endpoint. It will rate-limit the
+	// client based on their api token, and that is all.
 	Default = 0
 
 	// IPRateLimited sets the endpoint as being rate-limited by IP instead of by

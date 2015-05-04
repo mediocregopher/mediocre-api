@@ -1,4 +1,4 @@
-// package apihelper contains some methods which make working with the http
+// Package apihelper contains some methods which make working with the http
 // package a bit nicer
 package apihelper
 

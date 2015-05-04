@@ -1,4 +1,4 @@
-// package fwd implements forwarding requests from one http endpoint to another.
+// Package fwd implements forwarding requests from one http endpoint to another.
 // It's useful when you have some kind of internal api which you wish to expose
 // to the world, but you want to place some kind of proxy in front which will
 // handle rate-limiting and authentication and such.
