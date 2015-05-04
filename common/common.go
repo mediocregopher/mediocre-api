@@ -3,6 +3,7 @@
 package common
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -13,6 +14,14 @@ import (
 type ExpectedErr struct {
 	Code int
 	Err  string
+}
+
+// ExpectedErrf returns an ExpectedErr with a formatted message
+func ExpectedErrf(code int, s string, args ...interface{}) ExpectedErr {
+	return ExpectedErr{
+		Code: code,
+		Err:  fmt.Sprintf(s, args...),
+	}
 }
 
 // Error implements the error interface

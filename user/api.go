@@ -86,7 +86,7 @@ func NewMux(a *auth.API, c util.Cmder) http.Handler {
 			user := mux.Vars(r)["user"]
 
 			authUser := a.GetUser(r)
-			var filter FieldFilter
+			var filter FieldFlag
 			if user == authUser {
 				filter |= Private
 			}

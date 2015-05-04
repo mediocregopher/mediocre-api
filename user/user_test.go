@@ -70,8 +70,8 @@ func TestGetNonExistant(t *T) {
 
 func TestInternalSet(t *T) {
 	s := testSystem(t)
-	s.AddField(Field{Name: "foo", FieldFilter: Public})
-	s.AddField(Field{Name: "baz", FieldFilter: Public})
+	s.AddField(Field{Name: "foo", Flags: Public})
+	s.AddField(Field{Name: "baz", Flags: Public})
 	user := commontest.RandStr()
 
 	start := time.Now()
@@ -91,6 +91,36 @@ func TestInternalSet(t *T) {
 	assert.Equal(t, "bar", l[1])
 	assert.Equal(t, "buz", l[2])
 	assert.Equal(t, "", l[3])
+}
+
+func TestInternalSetExists(t *T) {
+	s := testSystem(t)
+	s.AddField(Field{Name: "foo", Flags: Public})
+	s.AddField(Field{Name: "baz", Flags: Public})
+	userDNE := commontest.RandStr()
+
+	err := s.setExists(userDNE, "foo", "bar", "baz", "buz")
+	assert.Equal(t, ErrNotFound, err)
+
+	user, _, _ := randUser(t, s)
+	start := time.Now()
+	err = s.set(user, "foo", "bar", "baz", "buz")
+	require.Nil(t, err)
+	end := time.Now()
+
+	tsModifiedKey := s.fields["TSModified"].Key
+	r := s.c.Cmd("HMGET", s.Key(user), tsModifiedKey, "foo", "baz", "box")
+	l, err := r.List()
+	require.Nil(t, err)
+
+	tsm, err := unmarshalTime(l[0])
+	require.Nil(t, err)
+	assert.True(t, tsm.After(start) && tsm.Before(end))
+
+	assert.Equal(t, "bar", l[1])
+	assert.Equal(t, "buz", l[2])
+	assert.Equal(t, "", l[3])
+
 }
 
 func TestLogin(t *T) {
@@ -157,4 +187,48 @@ func TestDisable(t *T) {
 	ok, err = s.Login(user, password)
 	assert.Nil(t, err)
 	assert.True(t, ok)
+}
+
+func TestSet(t *T) {
+	s := testSystem(t)
+	s.AddField(Field{Name: "foo", Flags: Public})
+	s.AddField(Field{Name: "bar", Flags: Public | Editable})
+	s.AddField(Field{Name: "baz", Flags: Public | EditableWithPassword})
+
+	userDNE := commontest.RandStr()
+	err := s.Set(userDNE, "", false, Info{"foo": "foo", "bar": "bar"})
+	assert.Equal(t, ErrFieldUneditable("foo"), err)
+
+	err = s.Set(userDNE, "", false, Info{"bar": "bar"})
+	assert.Equal(t, ErrNotFound, err)
+
+	err = s.Set(userDNE, "", false, Info{"bar": "bar", "baz": "baz"})
+	assert.Equal(t, ErrFieldRequiresPassword("baz"), err)
+
+	err = s.Set(userDNE, "", true, Info{"bar": "bar", "baz": "baz"})
+	assert.Equal(t, ErrNotFound, err)
+
+	user, _, password := randUser(t, s)
+	err = s.Set(user, "", false, Info{"bar": "bar"})
+	require.Nil(t, err)
+	u, err := s.Get(user, Public)
+	require.Nil(t, err)
+	assert.Equal(t, "bar", u["bar"])
+
+	err = s.Set(user, "WRONG", false, Info{"bar": "bar1", "baz": "baz1"})
+	assert.Equal(t, ErrBadAuth, err)
+
+	err = s.Set(user, password, false, Info{"bar": "bar1", "baz": "baz1"})
+	require.Nil(t, err)
+	u, err = s.Get(user, Public)
+	require.Nil(t, err)
+	assert.Equal(t, "bar1", u["bar"])
+	assert.Equal(t, "baz1", u["baz"])
+
+	err = s.Set(user, "WRONG", true, Info{"bar": "bar2", "baz": "baz2"})
+	require.Nil(t, err)
+	u, err = s.Get(user, Public)
+	require.Nil(t, err)
+	assert.Equal(t, "bar2", u["bar"])
+	assert.Equal(t, "baz2", u["baz"])
 }

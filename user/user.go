@@ -23,13 +23,40 @@ var (
 	ErrDisabled   = common.ExpectedErr{Code: 400, Err: "user account is disabled"}
 )
 
-// FieldFilter is used to describe a filter which can be used when retrieving
-// fields, so only fields which have the correspoding bitflag will be returned
-type FieldFilter uint64
+// Functions which return errors based on the related field names
+var (
+	ErrFieldUnknown = func(f string) error {
+		return common.ExpectedErrf(400, "unknown field %q", f)
+	}
+	ErrFieldUneditable = func(f string) error {
+		return common.ExpectedErrf(400, "field %q not editable", f)
+	}
+	ErrFieldRequiresPassword = func(f string) error {
+		return common.ExpectedErrf(400, "field %q requries password to edit", f)
+	}
+)
+
+// HMSETXX key fieldWhichExists field value [field value...]
+// Calls HMSET but only if fieldWhichExists is already set on the hash. Returns
+// 1 if set was successful, 0 if it failed due to the xx condition
+var hmsetxx = `
+	if not redis.call('HGET', KEYS[1], ARGV[1]) then
+		return 0
+	end
+	for i=2,#ARGV,2 do
+		redis.call('HSET', KEYS[1], ARGV[i], ARGV[i+1])
+	end
+	return 1
+`
+
+// FieldFlag is used to indicate different behaviors for different fields, such
+// as preventing them from being returned in certain circumstances, and allowing
+// them to be manually edited.
+type FieldFlag uint64
 
 const (
 	// Public fields will always be returned when calling Get
-	Public = 1 << iota
+	Public FieldFlag = 1 << iota
 
 	// Private fields are those that should only be shown to a verified entity,
 	// and may contain private user information. Generally, only shown to the
@@ -38,6 +65,14 @@ const (
 
 	// Hidden fields are never shown anywhere except in specific circumstances.
 	Hidden
+
+	// Editable indicates that this field is allowed to be modified manually
+	Editable
+
+	// EditableWithPassword indicates that this field is allowed to be modified
+	// manually, but only if the correct password for the user has been given as
+	// well
+	EditableWithPassword
 )
 
 // Field is a struct which describes a single field of a user map. A field's
@@ -52,9 +87,9 @@ type Field struct {
 	// redis (can be shorter than Name to save space)
 	Key string
 
-	// Used so that specific fields only show up in specific circumstances. This
-	// *must* be set to a value greater than zero
-	FieldFilter
+	// Used to determine the behavior of this field. This *must* be set to a
+	// value greater than zero
+	Flags FieldFlag
 }
 
 // Info represents information for a single user in the system. The fields in
@@ -65,12 +100,12 @@ type Info map[string]string
 // default user maps have the following fields:
 // * Name
 // * TSCreated
-// * Email (private)
+// * Email (private, editable)
 // * Verified (private)
 // * TSLastLoggedIn (private)
 // * TSModified (private)
 // * Disabled (private)
-// * PasswordHash (hidden)
+// * PasswordHash (hidden, editable with password)
 type System struct {
 	c util.Cmder
 
@@ -91,12 +126,12 @@ func New(c util.Cmder) *System {
 	}
 	s.AddField(Field{"Name", "_n", Public})
 	s.AddField(Field{"TSCreated", "_t", Public})
-	s.AddField(Field{"Email", "_e", Private})
+	s.AddField(Field{"Email", "_e", Private | Editable})
 	s.AddField(Field{"Verified", "_v", Private})
 	s.AddField(Field{"TSLastLoggedIn", "_tl", Private})
 	s.AddField(Field{"TSModified", "_tm", Private})
 	s.AddField(Field{"Disabled", "_d", Private})
-	s.AddField(Field{"PasswordHash", "_p", Hidden})
+	s.AddField(Field{"PasswordHash", "_p", Hidden | EditableWithPassword})
 	return &s
 }
 
@@ -173,7 +208,44 @@ func (s *System) Create(user, email, password string) error {
 func (s *System) set(user string, keyvals ...interface{}) error {
 	args := make([]interface{}, 0, len(keyvals)+3)
 	args = append(args, s.Key(user))
+	args, err := s.appendKeyvalsToArgs(user, keyvals, args)
+	if err != nil {
+		return err
+	}
 
+	return s.c.Cmd("HMSET", args...).Err
+}
+
+// same as set, but only if the user exists. Returns ErrNotFound if user doesn't
+// exist
+func (s *System) setExists(user string, keyvals ...interface{}) error {
+	args := make([]interface{}, 0, len(keyvals)+4)
+	args = append(args, s.Key(user))
+	args = append(args, s.fields["Name"].Key)
+	args, err := s.appendKeyvalsToArgs(user, keyvals, args)
+	if err != nil {
+		return err
+	}
+
+	i, err := util.LuaEval(s.c, hmsetxx, 1, args...).Int()
+	if err != nil {
+		return err
+	}
+	if i == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// Given a set of key/value pairs, keys being field names and values being what
+// they want to be set to, checks that all the fields are legitimate and adds on
+// a set for the TSModified field, appending all this to the passed in args
+// slice and returning the new slice
+func (s *System) appendKeyvalsToArgs(
+	user string, keyvals []interface{}, args []interface{},
+) (
+	[]interface{}, error,
+) {
 	tsModifiedFieldKey := s.fields["TSModified"].Key
 	nowS := marshalTime(time.Now())
 	args = append(args, tsModifiedFieldKey, nowS)
@@ -182,12 +254,12 @@ func (s *System) set(user string, keyvals ...interface{}) error {
 		k := keyvals[i].(string)
 		kf := s.fields[k].Key
 		if kf == "" {
-			return fmt.Errorf("unknown fields %q", k)
+			return nil, ErrFieldUnknown(k)
 		}
 		args = append(args, kf, keyvals[i+1])
 	}
 
-	return s.c.Cmd("HMSET", args...).Err
+	return args, nil
 }
 
 func (s *System) unset(user string, fields ...string) error {
@@ -198,11 +270,29 @@ func (s *System) unset(user string, fields ...string) error {
 	for i, f := range fields {
 		keys[i] = s.fields[f].Key
 		if keys[i] == "" {
-			return fmt.Errorf("unknown field %q", f)
+			return ErrFieldUnknown(f)
 		}
 	}
 
 	return s.c.Cmd("HDEL", s.Key(user), keys).Err
+}
+
+func (s *System) checkPassword(user, password string) error {
+	u, err := s.Get(user, Hidden|Private)
+	if err != nil {
+		return err
+	}
+
+	if u["Disabled"] != "" {
+		return ErrDisabled
+	}
+
+	p := u["PasswordHash"]
+	match := bcrypt.CompareHashAndPassword([]byte(p), []byte(password)) == nil
+	if !match {
+		return ErrBadAuth
+	}
+	return nil
 }
 
 // Login attempts to authenticate the user with the given password. If the
@@ -213,24 +303,14 @@ func (s *System) unset(user string, fields ...string) error {
 // lastLoggedIn failed. In reality only errors accompanied by a false really
 // matter
 func (s *System) Login(user, password string) (bool, error) {
-	u, err := s.Get(user, Hidden|Private)
+	err := s.checkPassword(user, password)
 	if err != nil {
 		return false, err
 	}
-
-	if u["Disabled"] != "" {
-		return false, ErrDisabled
-	}
-
-	p := u["PasswordHash"]
-	match := bcrypt.CompareHashAndPassword([]byte(p), []byte(password)) == nil
-	if match {
-		return true, s.set(user, "TSLastLoggedIn", marshalTime(time.Now()))
-	}
-	return false, ErrBadAuth
+	return true, s.set(user, "TSLastLoggedIn", marshalTime(time.Now()))
 }
 
-func (s *System) getFromResp(r *redis.Resp, filters FieldFilter) (Info, error) {
+func (s *System) getFromResp(r *redis.Resp, filters FieldFlag) (Info, error) {
 	m, err := r.Map()
 	if err != nil {
 		return nil, err
@@ -241,7 +321,7 @@ func (s *System) getFromResp(r *redis.Resp, filters FieldFilter) (Info, error) {
 
 	rm := Info{}
 	for f := range s.fields {
-		filt := s.fields[f].FieldFilter
+		filt := s.fields[f].Flags
 		if filt != Public && filt&filters == 0 {
 			continue
 		}
@@ -252,7 +332,7 @@ func (s *System) getFromResp(r *redis.Resp, filters FieldFilter) (Info, error) {
 
 // Get returns the Info for the given user, or ErrNotFound if the user couldn't
 // be found
-func (s *System) Get(user string, filters FieldFilter) (Info, error) {
+func (s *System) Get(user string, filters FieldFlag) (Info, error) {
 	key := s.Key(user)
 	return s.getFromResp(s.c.Cmd("HGETALL", key), filters)
 }
@@ -275,4 +355,45 @@ func (s *System) Disable(user string) error {
 // previously Disable'd
 func (s *System) Enable(user string) error {
 	return s.unset(user, "Disabled")
+}
+
+// Set is used to manually modify a user's fields. The Info argument need only
+// be filled with the fields which are desired to be changed. All fields given
+// in that argument must be either Editable or EditableWithPassword. If any have
+// EditableWithPassword then the user's current password must be passed in,
+// otherwise an empty string may be passed in instead. If ignoreAuth is set to
+// true than the password does not need to be given, even if some fields are
+// EditableWithPassword
+func (s *System) Set(user, password string, ignoreAuth bool, i Info) error {
+	var checkPassword bool
+	keyvals := make([]interface{}, 0, len(i)*2)
+	for fieldName, value := range i {
+		flags := s.fields[fieldName].Flags
+
+		if flags == 0 {
+			return ErrFieldUnknown(fieldName)
+
+		} else if flags&EditableWithPassword > 0 {
+			if !ignoreAuth {
+				if password == "" {
+					return ErrFieldRequiresPassword(fieldName)
+				}
+				checkPassword = true
+			}
+
+		} else if flags&Editable == 0 {
+			return ErrFieldUneditable(fieldName)
+		}
+
+		keyvals = append(keyvals, fieldName, value)
+	}
+
+	if checkPassword {
+		err := s.checkPassword(user, password)
+		if err != nil {
+			return err
+		}
+	}
+
+	return s.setExists(user, keyvals...)
 }
