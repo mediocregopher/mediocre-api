@@ -48,6 +48,18 @@ var hmsetxx = `
 	return 1
 `
 
+// HMSETNX key field value [field value...]
+// Calls HMSET but only if the key is currently empty. Returns 1 if set was
+// successful, 0 if it failed due to the nx condition
+var hmsetnx = `
+	if redis.call('HLEN', KEYS[1]) > 0 then
+		return 0
+	end
+
+	redis.call('HMSET', KEYS[1], unpack(ARGV))
+	return 1
+`
+
 // FieldFlag is used to indicate different behaviors for different fields, such
 // as preventing them from being returned in certain circumstances, and allowing
 // them to be manually edited.
@@ -171,27 +183,30 @@ func unmarshalTime(ts string) (time.Time, error) {
 func (s *System) Create(user, email, password string) error {
 	key := s.Key(user)
 	nowS := marshalTime(time.Now())
-	tsCreatedFieldKey := s.fields["TSCreated"].Key
-	i, err := s.c.Cmd("HSETNX", key, tsCreatedFieldKey, nowS).Int()
-	if err != nil {
-		return err
-	} else if i == 0 {
-		return ErrUserExists
-	}
 
 	hash, err := s.generatePassword(password)
 	if err != nil {
 		return err
 	}
 
-	if err = s.set(user,
+	args := make([]interface{}, 0, 9)
+	args = append(args, key)
+	args, err = s.appendKeyvalsToArgs([]interface{}{
 		"Name", user,
 		"PasswordHash", hash,
 		"Email", email,
-	); err != nil {
+		"TSCreated", nowS,
+	}, args)
+	if err != nil {
 		return err
 	}
 
+	i, err := util.LuaEval(s.c, hmsetnx, 1, args...).Int()
+	if err != nil {
+		return err
+	} else if i == 0 {
+		return ErrUserExists
+	}
 	return nil
 }
 
@@ -216,7 +231,7 @@ func (s *System) ChangePassword(user, newPassword string) error {
 func (s *System) set(user string, keyvals ...interface{}) error {
 	args := make([]interface{}, 0, len(keyvals)+3)
 	args = append(args, s.Key(user))
-	args, err := s.appendKeyvalsToArgs(user, keyvals, args)
+	args, err := s.appendKeyvalsToArgs(keyvals, args)
 	if err != nil {
 		return err
 	}
@@ -230,7 +245,7 @@ func (s *System) setExists(user string, keyvals ...interface{}) error {
 	args := make([]interface{}, 0, len(keyvals)+4)
 	args = append(args, s.Key(user))
 	args = append(args, s.fields["Name"].Key)
-	args, err := s.appendKeyvalsToArgs(user, keyvals, args)
+	args, err := s.appendKeyvalsToArgs(keyvals, args)
 	if err != nil {
 		return err
 	}
@@ -238,8 +253,7 @@ func (s *System) setExists(user string, keyvals ...interface{}) error {
 	i, err := util.LuaEval(s.c, hmsetxx, 1, args...).Int()
 	if err != nil {
 		return err
-	}
-	if i == 0 {
+	} else if i == 0 {
 		return ErrNotFound
 	}
 	return nil
@@ -250,7 +264,7 @@ func (s *System) setExists(user string, keyvals ...interface{}) error {
 // a set for the TSModified field, appending all this to the passed in args
 // slice and returning the new slice
 func (s *System) appendKeyvalsToArgs(
-	user string, keyvals []interface{}, args []interface{},
+	keyvals []interface{}, args []interface{},
 ) (
 	[]interface{}, error,
 ) {
