@@ -17,6 +17,10 @@ Errors are returned as strings in the body (not json-encoded), with a non-200
 response code. All bodies of 200 responses, if there is a body at all, will be
 json encoded.
 
+The `_asUser` GET argument can be used to indicate the call is being made on
+behalf of an authenticated user. This may be required for some calls (e.g. POST
+to `/<username>`), or augment other calls (e.g. GET to `/<username>`).
+
 Implemented endpoints are:
 
 -----
@@ -69,23 +73,15 @@ This may return `404 user not found`
 -----
 
 ```
-GET /<username>/token
+POST /<username>/auth
 
 {
     "Password":"User password"
 }
 ```
 
-Used to effectively log a user in. If the password is correct this will return:
-
-```
-{
-    "Token": "User token"
-}
-```
-
-Where the token can be used as the user token (see the [auth](/auth) package)
-for future requests.
+Used to confirm that the given password is the correct one for the user. A 200
+with no body is returned if the password is correct.
 
 On failure this may return:
 

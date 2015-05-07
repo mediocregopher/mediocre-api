@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/pickyjson"
 )
 
@@ -49,11 +50,11 @@ func Prepare(
 			return false
 		}
 		if err := pickyjson.CheckRequired(params); err != nil {
-			http.Error(w, err.Error(), 400)
+			common.HTTPError(w, r, err)
 			return false
 		}
 		if err := pickyjson.CheckRequired(&params); err != nil {
-			http.Error(w, err.Error(), 400)
+			common.HTTPError(w, r, err)
 			return false
 		}
 	}

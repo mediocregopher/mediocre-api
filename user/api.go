@@ -5,7 +5,6 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/gorilla/mux"
-	"github.com/mediocregopher/mediocre-api/auth"
 	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/common/apihelper"
 	"github.com/mediocregopher/mediocre-api/pickyjson"
@@ -33,7 +32,7 @@ var passwordParam = pickyjson.Str{
 // NewMux returns a new http.Handler (in reality a http.ServeMux) which has the
 // basic suite of user creation/modification endpoints. See the package README
 // for more information
-func NewMux(a *auth.API, c util.Cmder) http.Handler {
+func NewMux(c util.Cmder) http.Handler {
 	m := mux.NewRouter()
 	s := New(c)
 
@@ -55,7 +54,7 @@ func NewMux(a *auth.API, c util.Cmder) http.Handler {
 		},
 	)
 
-	m.Methods("GET").Path("/{user}/token").HandlerFunc(
+	m.Methods("POST").Path("/{user}/auth").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			user := mux.Vars(r)["user"]
 
@@ -73,10 +72,6 @@ func NewMux(a *auth.API, c util.Cmder) http.Handler {
 				common.HTTPError(w, r, err)
 				return
 			}
-
-			token := a.NewUserToken(user)
-
-			apihelper.JSONSuccess(w, &struct{ Token string }{token})
 		},
 	)
 
@@ -84,7 +79,7 @@ func NewMux(a *auth.API, c util.Cmder) http.Handler {
 		func(w http.ResponseWriter, r *http.Request) {
 			user := mux.Vars(r)["user"]
 
-			authUser := a.GetUser(r)
+			authUser := r.FormValue("_asUser")
 			var filter FieldFlag
 			if user == authUser {
 				filter |= Private
@@ -99,5 +94,5 @@ func NewMux(a *auth.API, c util.Cmder) http.Handler {
 		},
 	)
 
-	return a.WrapHandler(auth.Default, m)
+	return m
 }

@@ -7,18 +7,26 @@ package pickyjson
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
+
+	"github.com/mediocregopher/mediocre-api/common"
 )
 
 // Various errors which may be returned by this package
 var (
-	ErrTooLong   = errors.New("too long")
-	ErrTooShort  = errors.New("too short")
-	ErrMalformed = errors.New("malformed")
-	ErrTooBig    = errors.New("too big")
-	ErrTooSmall  = errors.New("too small")
+	ErrTooLong   = common.ExpectedErr{Code: 400, Err: "too long"}
+	ErrTooShort  = common.ExpectedErr{Code: 400, Err: "too short"}
+	ErrMalformed = common.ExpectedErr{Code: 400, Err: "malformed"}
+	ErrTooBig    = common.ExpectedErr{Code: 400, Err: "too big"}
+	ErrTooSmall  = common.ExpectedErr{Code: 400, Err: "too small"}
+)
+
+// Functions which return errors based on the related field names
+var (
+	ErrFieldRequiredf = func(f string) error {
+		return common.ExpectedErrf(400, "field %s required", f)
+	}
 )
 
 // Str is a wrapper for a normal go string, but with extra constraints. If a
@@ -176,13 +184,12 @@ func CheckRequired(i interface{}) error {
 		case Str:
 			if fieldVal.MinLength > 0 && fieldVal.Str == "" {
 				field := t.Field(ii)
-				return fmt.Errorf("field %s required", field.Name)
+				return ErrFieldRequiredf(field.Name)
 			}
 		case Int64:
-			fmt.Printf("Int64: %#v\n", fieldVal)
 			if fieldVal.Require && !fieldVal.filled {
 				field := t.Field(ii)
-				return fmt.Errorf("field %s required", field.Name)
+				return ErrFieldRequiredf(field.Name)
 			}
 		default:
 			fvk := fieldValV.Kind()
