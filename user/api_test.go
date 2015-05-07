@@ -1,17 +1,14 @@
 package user
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"runtime/debug"
 	. "testing"
 
 	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/common/commontest"
 	"github.com/mediocregopher/mediocre-api/pickyjson"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var testMux = func() http.Handler {
@@ -70,24 +67,16 @@ func TestAPIUserAuth(t *T) {
 	commontest.AssertReq(t, testMux, "POST", url, reqBody, "")
 }
 
-func requireJSONUnmarshal(t *T, body string, i interface{}) {
-	require.Nil(t, json.Unmarshal([]byte(body), &i), string(debug.Stack()))
-}
-
 func TestAPIUserGet(t *T) {
 	user, email, _ := testAPICreateUser(t)
 	url := fmt.Sprintf("/%s", user)
 	var i Info
 
-	code, body := commontest.Req(t, testMux, "GET", url, "")
-	assert.Equal(t, 200, code)
-	requireJSONUnmarshal(t, body, &i)
+	commontest.AssertReqJSON(t, testMux, "GET", url, "", &i)
 	assert.Equal(t, user, i["Name"])
 	assert.Equal(t, "", i["Email"])
 
-	code, body = commontest.Req(t, testMux, "GET", url+"?_asUser="+user, "")
-	assert.Equal(t, 200, code)
-	requireJSONUnmarshal(t, body, &i)
+	commontest.AssertReqJSON(t, testMux, "GET", url+"?_asUser="+user, "", &i)
 	assert.Equal(t, user, i["Name"])
 	assert.Equal(t, email, i["Email"])
 
@@ -106,10 +95,8 @@ func TestAPIUserSet(t *T) {
 	commontest.AssertReqErr(t, testMux, "POST", url, reqBody, ErrBadAuth)
 	commontest.AssertReq(t, testMux, "POST", urlAs, reqBody, "")
 
-	code, body := commontest.Req(t, testMux, "GET", urlAs, "")
-	assert.Equal(t, 200, code)
 	var i Info
-	requireJSONUnmarshal(t, body, &i)
+	commontest.AssertReqJSON(t, testMux, "GET", urlAs, "", &i)
 	assert.Equal(t, user, i["Name"])
 	assert.Equal(t, newEmail, i["Email"])
 }

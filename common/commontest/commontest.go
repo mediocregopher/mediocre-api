@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -67,6 +68,20 @@ func AssertReq(
 	code, body := Req(t, mux, method, endpoint, body)
 	assert.Equal(t, 200, code, "\n%s", string(debug.Stack()))
 	assert.Equal(t, expectedBody, body, "\n%s", string(debug.Stack()))
+}
+
+// AssertReqJSON uses the stretchr/assert package to assert that the result of
+// calling Req with the given arguments has a 200 response and a body which is
+// unmarshaled into dst successfully.
+func AssertReqJSON(
+	t *testing.T, mux http.Handler, method, endpoint, body string,
+	dst interface{},
+) {
+	code, body := Req(t, mux, method, endpoint, body)
+	assert.Equal(t, 200, code, "\n%s", string(debug.Stack()))
+
+	err := json.Unmarshal([]byte(body), dst)
+	require.Nil(t, err, "\n%s", string(debug.Stack()))
 }
 
 // AssertReqErr uses the stretchr/assert package to assert that the result of
