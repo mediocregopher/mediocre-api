@@ -85,6 +85,26 @@ with no body is returned if the password is correct.
 
 On failure this may return:
 
-* `400 user not found`
+* `404 user not found`
 * `400 user account is disabled`
 * `400 could not authenticate user`
+
+-----
+
+```
+POST /<username>
+
+{
+    "Editable field":"New value"
+}
+```
+
+Used to modify one or more fields which are `Editable`. Must be authd as the
+user in order to call. A 200 with no body is returned if successful.
+
+On failure this may return:
+
+* `404 user not found`
+* `400 could not authenticate user`
+* `400 unknown field <field>`
+* `400 field <field> not editable`

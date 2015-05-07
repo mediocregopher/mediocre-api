@@ -95,3 +95,21 @@ func TestAPIUserGet(t *T) {
 	url = fmt.Sprintf("/%s", user404)
 	commontest.AssertReqErr(t, testMux, "GET", url, "", ErrNotFound)
 }
+
+func TestAPIUserSet(t *T) {
+	user, email, _ := testAPICreateUser(t)
+	url := fmt.Sprintf("/%s", user)
+	urlAs := fmt.Sprintf("/%s?_asUser=%s", user, user)
+	newEmail := "foo_" + email
+
+	reqBody := fmt.Sprintf(`{"Email":"%s"}`, newEmail)
+	commontest.AssertReqErr(t, testMux, "POST", url, reqBody, ErrBadAuth)
+	commontest.AssertReq(t, testMux, "POST", urlAs, reqBody, "")
+
+	code, body := commontest.Req(t, testMux, "GET", urlAs, "")
+	assert.Equal(t, 200, code)
+	var i Info
+	requireJSONUnmarshal(t, body, &i)
+	assert.Equal(t, user, i["Name"])
+	assert.Equal(t, newEmail, i["Email"])
+}

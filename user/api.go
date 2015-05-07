@@ -94,5 +94,25 @@ func NewMux(c util.Cmder) http.Handler {
 		},
 	)
 
+	m.Methods("POST").Path("/{user}").HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			user := mux.Vars(r)["user"]
+			if r.FormValue("_asUser") != user {
+				common.HTTPError(w, r, ErrBadAuth)
+				return
+			}
+
+			j := Info{}
+			if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
+				return
+			}
+
+			if err := s.Set(user, j); err != nil {
+				common.HTTPError(w, r, err)
+				return
+			}
+		},
+	)
+
 	return m
 }
