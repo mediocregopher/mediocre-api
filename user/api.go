@@ -29,6 +29,17 @@ var passwordParam = pickyjson.Str{
 	MaxLength: 255,
 }
 
+func requireAuthd(hf http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := mux.Vars(r)["user"]
+		if r.FormValue("_asUser") != user {
+			common.HTTPError(w, r, ErrBadAuth)
+			return
+		}
+		hf(w, r)
+	}
+}
+
 // NewMux returns a new http.Handler (in reality a http.ServeMux) which has the
 // basic suite of user creation/modification endpoints. See the package README
 // for more information
@@ -74,53 +85,49 @@ func NewMux(c util.Cmder) http.Handler {
 	)
 
 	m.Methods("POST").Path("/{user}").HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			user := mux.Vars(r)["user"]
-			if r.FormValue("_asUser") != user {
-				common.HTTPError(w, r, ErrBadAuth)
-				return
-			}
+		requireAuthd(
+			func(w http.ResponseWriter, r *http.Request) {
+				user := mux.Vars(r)["user"]
 
-			j := Info{}
-			if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
-				return
-			}
+				j := Info{}
+				if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
+					return
+				}
 
-			if err := s.Set(user, j); err != nil {
-				common.HTTPError(w, r, err)
-				return
-			}
-		},
+				if err := s.Set(user, j); err != nil {
+					common.HTTPError(w, r, err)
+					return
+				}
+			},
+		),
 	)
 
 	m.Methods("POST").Path("/{user}/password").HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			user := mux.Vars(r)["user"]
-			if r.FormValue("_asUser") != user {
-				common.HTTPError(w, r, ErrBadAuth)
-				return
-			}
+		requireAuthd(
+			func(w http.ResponseWriter, r *http.Request) {
+				user := mux.Vars(r)["user"]
 
-			j := struct {
-				OldPassword, NewPassword pickyjson.Str
-			}{
-				OldPassword: passwordParam.Required(),
-				NewPassword: passwordParam.Required(),
-			}
-			if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
-				return
-			}
+				j := struct {
+					OldPassword, NewPassword pickyjson.Str
+				}{
+					OldPassword: passwordParam.Required(),
+					NewPassword: passwordParam.Required(),
+				}
+				if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
+					return
+				}
 
-			if err := s.Authenticate(user, j.OldPassword.Str); err != nil {
-				common.HTTPError(w, r, err)
-				return
-			}
+				if err := s.Authenticate(user, j.OldPassword.Str); err != nil {
+					common.HTTPError(w, r, err)
+					return
+				}
 
-			if err := s.ChangePassword(user, j.NewPassword.Str); err != nil {
-				common.HTTPError(w, r, err)
-				return
-			}
-		},
+				if err := s.ChangePassword(user, j.NewPassword.Str); err != nil {
+					common.HTTPError(w, r, err)
+					return
+				}
+			},
+		),
 	)
 
 	m.Methods("POST").Path("/{user}/auth").HandlerFunc(
