@@ -75,7 +75,7 @@ func main() {
 	http.Handle("/welcome", a.WrapHandlerFunc(
 		auth.RequireUserAuthAlways,
 		func(w http.ResponseWriter, r *http.Request) {
-			username := a.GetUser(r)
+			username := r.FormValue("_asUser")
 			fmt.Fprintf(w, "Welcome to the site, %s!", username)
 		},
 	))

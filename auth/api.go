@@ -4,27 +4,27 @@
 package auth
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mediocregopher/mediocre-api/auth/apitok"
 	"github.com/mediocregopher/mediocre-api/auth/usertok"
+	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/common/apihelper"
 )
 
 // Various error responses this package may return (these will all be appended
 // with a newline in the final output)
 var (
-	APITokenMissing     = "api token missing"
-	APITokenInvalid     = "api token invalid"
-	APITokenRateLimited = "chill bro..."
-	IPAddrRateLimited   = "chill bro...."
-	UserTokenMissing    = "user token missing"
-	UserTokenInvalid    = "user token invalid"
-	SecretNotSet        = "secret not set on server"
-	UnknownProblem      = "unknown problem"
+	ErrAPITokenMissing     = common.ExpectedErr{Code: 400, Err: "api token missing"}
+	ErrAPITokenInvalid     = common.ExpectedErr{Code: 400, Err: "api token invalid"}
+	ErrAPITokenRateLimited = common.ExpectedErr{Code: 420, Err: "chill bro"}
+	ErrIPAddrRateLimited   = common.ExpectedErr{Code: 420, Err: "chill bro"}
+	ErrUserTokenMissing    = common.ExpectedErr{Code: 400, Err: "user token missing"}
+	ErrUserTokenInvalid    = common.ExpectedErr{Code: 400, Err: "user token invalid"}
+	ErrSecretNotSet        = common.ExpectedErr{Code: 500, Err: "secret not set on server"}
+	ErrUnknownProblem      = common.ExpectedErr{Code: 500, Err: "unknown problem"}
 )
 
 // Various http headers which this package will look for
@@ -183,12 +183,10 @@ func (ah *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case apitok.Success:
 			token = r.RemoteAddr
 		case apitok.RateLimited:
-			w.WriteHeader(420)
-			fmt.Fprintln(w, IPAddrRateLimited)
+			common.HTTPError(w, r, ErrIPAddrRateLimited)
 			return
 		default:
-			w.WriteHeader(400)
-			fmt.Fprintln(w, UnknownProblem)
+			common.HTTPError(w, r, ErrUnknownProblem)
 			return
 		}
 
@@ -196,47 +194,33 @@ func (ah *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if ah.flags&NoAPITokenRequired == 0 && secret != nil {
 		apiToken := ah.api.GetAPIToken(r)
 		if apiToken == "" {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, APITokenMissing)
+			common.HTTPError(w, r, ErrAPITokenMissing)
 			return
 		}
 		switch ah.api.RateLimiter.CanUse(apiToken, secret) {
 		case apitok.Success:
 			token = apiToken
 		case apitok.TokenInvalid:
-			w.WriteHeader(400)
-			fmt.Fprintln(w, APITokenInvalid)
+			common.HTTPError(w, r, ErrAPITokenInvalid)
 			return
 		case apitok.RateLimited:
-			w.WriteHeader(420)
-			fmt.Fprintln(w, IPAddrRateLimited)
+			common.HTTPError(w, r, ErrAPITokenRateLimited)
 			return
 		default:
-			w.WriteHeader(400)
-			fmt.Fprintln(w, UnknownProblem)
+			common.HTTPError(w, r, ErrUnknownProblem)
 			return
 		}
 	}
 
-	if ah.requiresUserAuth(r) {
-		if secret == nil {
-			w.WriteHeader(500)
-			fmt.Fprintf(w, SecretNotSet)
-			return
-		}
-
-		userTok := r.Header.Get(UserTokenHeader)
-		if userTok == "" {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, UserTokenMissing)
-			return
-		}
-
-		if usertok.ExtractUser(userTok, secret) == "" {
-			w.WriteHeader(400)
-			fmt.Fprintln(w, UserTokenInvalid)
-			return
-		}
+	user, err := ah.authdUser(r)
+	if ah.requiresUserAuth(r) && err != nil {
+		common.HTTPError(w, r, err)
+		return
+	}
+	if user != "" {
+		values := r.URL.Query()
+		values.Add("_asUser", user)
+		r.URL.RawQuery = values.Encode()
 	}
 
 	start := time.Now()
@@ -246,6 +230,25 @@ func (ah *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		elapsed := time.Since(start)
 		ah.api.RateLimiter.Use(token, elapsed)
 	}
+}
+
+func (ah *authHandler) authdUser(r *http.Request) (string, error) {
+	secret := ah.api.Secret
+	if secret == nil {
+		return "", ErrSecretNotSet
+	}
+
+	userTok := r.Header.Get(UserTokenHeader)
+	if userTok == "" {
+		return "", ErrUserTokenMissing
+	}
+
+	user := usertok.ExtractUser(userTok, secret)
+	if user == "" {
+		return "", ErrUserTokenInvalid
+	}
+
+	return user, nil
 }
 
 func (ah *authHandler) requiresUserAuth(r *http.Request) bool {
