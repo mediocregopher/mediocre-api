@@ -15,7 +15,7 @@ import (
 )
 
 var testMux = func() http.Handler {
-	_, cmder := commontest.APIStarterKit()
+	cmder := commontest.APIStarterKit()
 	return NewMux(cmder)
 }()
 

@@ -10,9 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime/debug"
-	. "testing"
+	"testing"
 
-	"github.com/mediocregopher/mediocre-api/auth"
 	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/radix.v2/pool"
 	"github.com/mediocregopher/radix.v2/util"
@@ -22,15 +21,12 @@ import (
 
 // APIStarterKit returns an initialized *API and a Cmder which can be used as
 // generic entities for testing
-func APIStarterKit() (*auth.API, util.Cmder) {
+func APIStarterKit() util.Cmder {
 	p, err := pool.New("tcp", "localhost:6379", 10)
 	if err != nil {
 		panic(err)
 	}
-
-	a := auth.NewAPI()
-	a.Secret = []byte("SHOOPDAWOOP")
-	return a, p
+	return p
 }
 
 // RandStr returns a string of random alphanumeric characters
@@ -50,7 +46,11 @@ func RandEmail() string {
 // Req is a method which makes testing http requests easier. It makes the
 // request with the given method and body against the given endpoint, returning
 // the return status code and body
-func Req(t *T, mux http.Handler, method, endpoint, body string) (int, string) {
+func Req(
+	t *testing.T, mux http.Handler, method, endpoint, body string,
+) (
+	int, string,
+) {
 	r, err := http.NewRequest(method, endpoint, bytes.NewBufferString(body))
 	require.Nil(t, err, "\n%s", string(debug.Stack()))
 	w := httptest.NewRecorder()
@@ -61,7 +61,9 @@ func Req(t *T, mux http.Handler, method, endpoint, body string) (int, string) {
 // AssertReq uses the stretchr/assert package to assert that the result of
 // calling Req with the given arguments has a 200 response code and the given
 // expectedBody
-func AssertReq(t *T, mux http.Handler, method, endpoint, body, expectedBody string) {
+func AssertReq(
+	t *testing.T, mux http.Handler, method, endpoint, body, expectedBody string,
+) {
 	code, body := Req(t, mux, method, endpoint, body)
 	assert.Equal(t, 200, code, "\n%s", string(debug.Stack()))
 	assert.Equal(t, expectedBody, body, "\n%s", string(debug.Stack()))
@@ -71,7 +73,8 @@ func AssertReq(t *T, mux http.Handler, method, endpoint, body, expectedBody stri
 // calling Req with the given arguments has a response code equal to the given
 // ExpectedErr's and a body the same as well
 func AssertReqErr(
-	t *T, mux http.Handler, method, endpoint, body string, err common.ExpectedErr,
+	t *testing.T, mux http.Handler, method, endpoint, body string,
+	err common.ExpectedErr,
 ) {
 	code, body := Req(t, mux, method, endpoint, body)
 	assert.Equal(t, err.Code, code, "\n%s", string(debug.Stack()))
