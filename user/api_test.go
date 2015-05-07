@@ -54,19 +54,6 @@ func TestAPINewUser(t *T) {
 	commontest.AssertReqErr(t, testMux, "POST", "/new-user", reqBody, ErrUserExists)
 }
 
-// TestAPIUserAuth tests retrieving a user token from the api. Essentially,
-// logging in
-func TestAPIUserAuth(t *T) {
-	user, _, password := testAPICreateUser(t)
-	url := fmt.Sprintf("/%s/auth", user)
-
-	reqBody := `{"Password":"aaaaaa"}`
-	commontest.AssertReqErr(t, testMux, "POST", url, reqBody, ErrBadAuth)
-
-	reqBody = fmt.Sprintf(`{"Password":"%s"}`, password)
-	commontest.AssertReq(t, testMux, "POST", url, reqBody, "")
-}
-
 func TestAPIUserGet(t *T) {
 	user, email, _ := testAPICreateUser(t)
 	url := fmt.Sprintf("/%s", user)
@@ -99,4 +86,42 @@ func TestAPIUserSet(t *T) {
 	commontest.AssertReqJSON(t, testMux, "GET", urlAs, "", &i)
 	assert.Equal(t, user, i["Name"])
 	assert.Equal(t, newEmail, i["Email"])
+}
+
+func TestAPIUserChangePassword(t *T) {
+	user, _, oldPassword := testAPICreateUser(t)
+	newPassword := commontest.RandStr()
+	url := fmt.Sprintf("/%s/password", user)
+	urlAs := fmt.Sprintf("/%s/password?_asUser=%s", user, user)
+	urlAuth := fmt.Sprintf("/%s/auth?_asUser=%s", user, user)
+
+	reqBody := fmt.Sprintf(`{"OldPassword":"aaaaaa","NewPassword":"%s"}`, newPassword)
+	commontest.AssertReqErr(t, testMux, "POST", url, reqBody, ErrBadAuth)
+	commontest.AssertReqErr(t, testMux, "POST", urlAs, reqBody, ErrBadAuth)
+
+	// Ensure that the last two calls didn't actually change the password
+	reqBody = fmt.Sprintf(`{"Password":"%s"}`, oldPassword)
+	commontest.AssertReq(t, testMux, "POST", urlAuth, reqBody, "")
+
+	reqBody = fmt.Sprintf(`{"OldPassword":"%s","NewPassword":"%s"}`, oldPassword, newPassword)
+	commontest.AssertReq(t, testMux, "POST", urlAs, reqBody, "")
+
+	// Ensure that the old password now doesn't work and the new one does
+	reqBody = fmt.Sprintf(`{"Password":"%s"}`, oldPassword)
+	commontest.AssertReqErr(t, testMux, "POST", urlAuth, reqBody, ErrBadAuth)
+	reqBody = fmt.Sprintf(`{"Password":"%s"}`, newPassword)
+	commontest.AssertReq(t, testMux, "POST", urlAuth, reqBody, "")
+}
+
+// TestAPIUserAuth tests retrieving a user token from the api. Essentially,
+// logging in
+func TestAPIUserAuth(t *T) {
+	user, _, password := testAPICreateUser(t)
+	url := fmt.Sprintf("/%s/auth", user)
+
+	reqBody := `{"Password":"aaaaaa"}`
+	commontest.AssertReqErr(t, testMux, "POST", url, reqBody, ErrBadAuth)
+
+	reqBody = fmt.Sprintf(`{"Password":"%s"}`, password)
+	commontest.AssertReq(t, testMux, "POST", url, reqBody, "")
 }

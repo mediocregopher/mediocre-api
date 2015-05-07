@@ -54,27 +54,6 @@ func NewMux(c util.Cmder) http.Handler {
 		},
 	)
 
-	m.Methods("POST").Path("/{user}/auth").HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			user := mux.Vars(r)["user"]
-
-			j := struct {
-				Password pickyjson.Str
-			}{
-				Password: passwordParam.Required(),
-			}
-			if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
-				return
-			}
-
-			// login only succeeds without an error
-			if err := s.Authenticate(user, j.Password.Str); err != nil {
-				common.HTTPError(w, r, err)
-				return
-			}
-		},
-	)
-
 	m.Methods("GET").Path("/{user}").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			user := mux.Vars(r)["user"]
@@ -108,6 +87,57 @@ func NewMux(c util.Cmder) http.Handler {
 			}
 
 			if err := s.Set(user, j); err != nil {
+				common.HTTPError(w, r, err)
+				return
+			}
+		},
+	)
+
+	m.Methods("POST").Path("/{user}/password").HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			user := mux.Vars(r)["user"]
+			if r.FormValue("_asUser") != user {
+				common.HTTPError(w, r, ErrBadAuth)
+				return
+			}
+
+			j := struct {
+				OldPassword, NewPassword pickyjson.Str
+			}{
+				OldPassword: passwordParam.Required(),
+				NewPassword: passwordParam.Required(),
+			}
+			if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
+				return
+			}
+
+			if err := s.Authenticate(user, j.OldPassword.Str); err != nil {
+				common.HTTPError(w, r, err)
+				return
+			}
+
+			if err := s.ChangePassword(user, j.NewPassword.Str); err != nil {
+				common.HTTPError(w, r, err)
+				return
+			}
+		},
+	)
+
+	m.Methods("POST").Path("/{user}/auth").HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			user := mux.Vars(r)["user"]
+
+			j := struct {
+				Password pickyjson.Str
+			}{
+				Password: passwordParam.Required(),
+			}
+			if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
+				return
+			}
+
+			// login only succeeds without an error
+			if err := s.Authenticate(user, j.Password.Str); err != nil {
 				common.HTTPError(w, r, err)
 				return
 			}
