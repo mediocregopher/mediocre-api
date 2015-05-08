@@ -53,6 +53,10 @@ func TestCreateGet(t *T) {
 	tsModified, err := unmarshalTime(pi["TSModified"])
 	require.Nil(t, err)
 	assert.True(t, tsModified.After(start) && tsModified.Before(end))
+
+	// Try to create a banned username
+	err = s.Create("root", email, password)
+	assert.Equal(t, ErrInvalidUsername, err)
 }
 
 func TestGetNonExistant(t *T) {

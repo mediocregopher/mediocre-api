@@ -19,10 +19,11 @@ import (
 
 // Errors which can be expected from various methods in this package
 var (
-	ErrUserExists = common.ExpectedErr{Code: 400, Err: "user exists"}
-	ErrNotFound   = common.ExpectedErr{Code: 404, Err: "user not found"}
-	ErrBadAuth    = common.ExpectedErr{Code: 400, Err: "could not authenticate user"}
-	ErrDisabled   = common.ExpectedErr{Code: 400, Err: "user account is disabled"}
+	ErrUserExists      = common.ExpectedErr{Code: 400, Err: "user exists"}
+	ErrNotFound        = common.ExpectedErr{Code: 404, Err: "user not found"}
+	ErrBadAuth         = common.ExpectedErr{Code: 400, Err: "could not authenticate user"}
+	ErrDisabled        = common.ExpectedErr{Code: 400, Err: "user account is disabled"}
+	ErrInvalidUsername = common.ExpectedErr{Code: 400, Err: "invalid username"}
 )
 
 // Functions which return errors based on the related field names
@@ -117,6 +118,10 @@ type System struct {
 	// defaults to 11 and can be set right after instantiation
 	BCryptCost int
 
+	// A list of usernames which are not allowed to be created. Defaults to
+	// []string{"new-user", "root"}
+	BannedUsernames []string
+
 	fields map[string]Field
 }
 
@@ -124,9 +129,10 @@ type System struct {
 // layer
 func New(c util.Cmder) *System {
 	s := System{
-		c:          c,
-		BCryptCost: 11,
-		fields:     map[string]Field{},
+		c:               c,
+		BCryptCost:      11,
+		BannedUsernames: []string{"new-user", "root"},
+		fields:          map[string]Field{},
 	}
 	s.AddField(Field{"Name", "_n", Public})
 	s.AddField(Field{"TSCreated", "_t", Public})
@@ -181,6 +187,12 @@ func unmarshalTime(ts string) (time.Time, error) {
 // the user already exists ErrUserExists will be returned. If not the password
 // will be hashed and stored
 func (s *System) Create(user, email, password string) error {
+	for _, bannedUser := range s.BannedUsernames {
+		if bannedUser == user {
+			return ErrInvalidUsername
+		}
+	}
+
 	key := s.Key(user)
 	nowS := marshalTime(time.Now())
 
