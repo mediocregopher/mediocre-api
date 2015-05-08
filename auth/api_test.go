@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -102,17 +101,4 @@ func TestUserToken(t *T) {
 	assertReqErr(t, testMux, "POST", "/baz", apiTok, "", ErrUserTokenMissing)
 	assertReqErr(t, testMux, "POST", "/baz", apiTok, "blah blah blah", ErrUserTokenInvalid)
 	assertReq(t, testMux, "POST", "/baz", apiTok, userTok, username+"\n"+username)
-}
-
-var testBuiltinAPI, testBuiltinMux = func() (*API, http.Handler) {
-	m, a := NewMux([]byte("turtles"))
-	return a, m
-}()
-
-func TestBulitinAPIToken(t *T) {
-	code, body := req(t, testBuiltinMux, "GET", "/token", "", "")
-	assert.Equal(t, 200, code)
-	s := struct{ Token string }{}
-	assert.Nil(t, json.Unmarshal([]byte(body), &s))
-	assert.NotEqual(t, "", s.Token)
 }

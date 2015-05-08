@@ -14,6 +14,37 @@ A simple http middleware. It provides:
 
 * Swappable storage backend for rate-limiting data
 
+## API Token
+
+The api token is the basis of rate-limiting in most cases. All requests by
+default require an api key to be set on the header `X-API-TOKEN`, which must be
+retrieved from the api itself.
+
+**API tokens are only valid for 3 hours. The application must expect this and
+get a new one periodically**
+
+### Rate-Limiting
+
+Rate limiting is based on a time bucket system. You can read more about it in
+the apitok package docs. Parameters for rate-limiting on the api can be set by
+modifying the `RateLimiter`'s fields on the `API` struct returned from
+`NewAPI`.
+
+The storage backend for rate limiting can also be changed. By default the data
+is stored in memory, but anything implementing `apitok.RateLimitStore` can
+replace it in the `api.RateLimiter.Backend` field.
+
+Any modifications to rate limiting fields must be done before the call to
+`ListenAndServe`.
+
+## User authentication
+
+User authentication is based upon a simple user token system. A client retrieves
+a user token from the api, which authenticates the user however it wants and
+returns a token generated through `NewUserToken`. This token must be included
+with any requests that require user authentication as the `X-USER-TOKEN` header.
+The api may retrieve the authenticated user identifier using `GetUser`.
+
 ## Example
 
 Here's an example simple but complete api, and an explanation for each step:
@@ -83,58 +114,3 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 ```
-
-## API Token
-
-The api token is the basis of rate-limiting in most cases. All requests by
-default require an api key to be set on the header `X-API-TOKEN`, which must be
-retrieved from the api itself.
-
-**API tokens are only valid for 3 hours. The application must expect this and
-get a new one periodically**
-
-### Rate-Limiting
-
-Rate limiting is based on a time bucket system. You can read more about it in
-the apitok package docs. Parameters for rate-limiting on the api can be set by
-modifying the `RateLimiter`'s fields on the `API` struct returned from
-`NewAPI`.
-
-The storage backend for rate limiting can also be changed. By default the data
-is stored in memory, but anything implementing `apitok.RateLimitStore` can
-replace it in the `api.RateLimiter.Backend` field.
-
-Any modifications to rate limiting fields must be done before the call to
-`ListenAndServe`.
-
-## User authentication
-
-User authentication is based upon a simple user token system. A client retrieves
-a user token from the api, which authenticates the user however it wants and
-returns a token generated through `NewUserToken`. This token must be included
-with any requests that require user authentication as the `X-USER-TOKEN` header.
-The api may retrieve the authenticated user identifier using `GetUser`.
-
-## Builtin
-
-There is a builtin REST api which can be used (`NewMux`). It is not necessary to
-use this api if you don't wish to, the rest of the package is perfectly usable
-without it. It's simply a nice place to started.
-
-Implemented endpoints are:
-
------
-
-```
-GET /token
-```
-
-Used to retrieve a new API token. Returns:
-
-```
-{
-    "Token": "API token"
-}
-```
-
-This may return `420 chill bro...` if the IP is rate-limited

@@ -54,6 +54,7 @@ func Req(
 ) {
 	r, err := http.NewRequest(method, endpoint, bytes.NewBufferString(body))
 	require.Nil(t, err, "\n%s", string(debug.Stack()))
+	r.RemoteAddr = "1.1.1.1:50000"
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, r)
 	return w.Code, w.Body.String()

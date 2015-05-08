@@ -11,7 +11,6 @@ import (
 	"github.com/mediocregopher/mediocre-api/auth/apitok"
 	"github.com/mediocregopher/mediocre-api/auth/usertok"
 	"github.com/mediocregopher/mediocre-api/common"
-	"github.com/mediocregopher/mediocre-api/common/apihelper"
 )
 
 // Various error responses this package may return (these will all be appended
@@ -272,30 +271,4 @@ func (ah *authHandler) requiresUserAuth(r *http.Request) bool {
 	}
 
 	return ah.flags&checkFlag != 0
-}
-
-// NewMux returns a new http.Handler which has basic endpoints pre-defined
-// endpoints for interacting with this package. It also returns the *API which
-// is being used, so that its parameters may be changed before actually serving
-// requests (e.g. setting a new rate limiter). The Secret field on API will be
-// set automatically by the one passed into this function. See the package
-// README for more information
-func NewMux(secret []byte) (http.Handler, *API) {
-	m := http.NewServeMux()
-	a := NewAPI()
-	a.Secret = secret
-
-	m.Handle("/token", a.WrapHandlerFunc(
-		IPRateLimited,
-		func(w http.ResponseWriter, r *http.Request) {
-			if !apihelper.Prepare(w, r, nil, 0) {
-				return
-			}
-
-			token := a.NewAPIToken()
-			apihelper.JSONSuccess(w, &struct{ Token string }{token})
-		},
-	))
-
-	return m, a
 }
