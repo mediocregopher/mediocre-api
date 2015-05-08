@@ -1,13 +1,18 @@
-package user
+package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/gorilla/mux"
+	"github.com/mediocregopher/lever"
 	"github.com/mediocregopher/mediocre-api/common"
 	"github.com/mediocregopher/mediocre-api/common/apihelper"
 	"github.com/mediocregopher/mediocre-api/pickyjson"
+	"github.com/mediocregopher/mediocre-api/user"
+	"github.com/mediocregopher/radix.v2/cluster"
+	"github.com/mediocregopher/radix.v2/pool"
 	"github.com/mediocregopher/radix.v2/util"
 )
 
@@ -29,23 +34,67 @@ var passwordParam = pickyjson.Str{
 	MaxLength: 255,
 }
 
+func main() {
+	l := lever.New("shield", nil)
+	l.Add(lever.Param{
+		Name:        "--listen-addr",
+		Description: "Address to listen for api requests on",
+		Default:     ":8081",
+	})
+	l.Add(lever.Param{
+		Name:        "--redis-addr",
+		Description: "Address redis is listening on",
+		Default:     "127.0.0.1:6379",
+	})
+	l.Add(lever.Param{
+		Name:        "--redis-pool-size",
+		Description: "Number of connections to make for each redis instance",
+		Default:     "10",
+	})
+	l.Add(lever.Param{
+		Name:        "--redis-cluster",
+		Description: "Whether or not to treat the redis address as a node in a larger cluster",
+		Flag:        true,
+	})
+	l.Parse()
+
+	addr, _ := l.ParamStr("--listen-addr")
+	redisAddr, _ := l.ParamStr("--redis-addr")
+	redisPoolSize, _ := l.ParamInt("--redis-pool-size")
+	redisCluster := l.ParamFlag("--redis-cluster")
+
+	var cmder util.Cmder
+	var err error
+	if redisCluster {
+		cmder, err = cluster.NewWithOpts(cluster.Opts{
+			Addr:     redisAddr,
+			PoolSize: redisPoolSize,
+		})
+	} else {
+		cmder, err = pool.New("tcp", redisAddr, redisPoolSize)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("listening on %s", addr)
+	log.Fatal(http.ListenAndServe(addr, userMux(cmder)))
+}
+
 func requireAuthd(hf http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := mux.Vars(r)["user"]
-		if r.FormValue("_asUser") != user {
-			common.HTTPError(w, r, ErrBadAuth)
+		u := mux.Vars(r)["user"]
+		if r.FormValue("_asUser") != u {
+			common.HTTPError(w, r, user.ErrBadAuth)
 			return
 		}
 		hf(w, r)
 	}
 }
 
-// NewMux returns a new http.Handler (in reality a http.ServeMux) which has the
-// basic suite of user creation/modification endpoints. See the package README
-// for more information
-func NewMux(c util.Cmder) http.Handler {
+func userMux(cmder util.Cmder) http.Handler {
 	m := mux.NewRouter()
-	s := New(c)
+	s := user.New(cmder)
 
 	m.Methods("POST").Path("/new-user").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -67,14 +116,14 @@ func NewMux(c util.Cmder) http.Handler {
 
 	m.Methods("GET").Path("/{user}").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			user := mux.Vars(r)["user"]
+			u := mux.Vars(r)["user"]
 
-			authUser := r.FormValue("_asUser")
-			var filter FieldFlag
-			if user == authUser {
-				filter |= Private
+			authU := r.FormValue("_asUser")
+			var filter user.FieldFlag
+			if u == authU {
+				filter |= user.Private
 			}
-			ret, err := s.Get(user, filter)
+			ret, err := s.Get(u, filter)
 
 			if err != nil {
 				common.HTTPError(w, r, err)
@@ -87,14 +136,14 @@ func NewMux(c util.Cmder) http.Handler {
 	m.Methods("POST").Path("/{user}").HandlerFunc(
 		requireAuthd(
 			func(w http.ResponseWriter, r *http.Request) {
-				user := mux.Vars(r)["user"]
+				u := mux.Vars(r)["user"]
 
-				j := Info{}
+				j := user.Info{}
 				if !apihelper.Prepare(w, r, &j, bodySizeLimit) {
 					return
 				}
 
-				if err := s.Set(user, j); err != nil {
+				if err := s.Set(u, j); err != nil {
 					common.HTTPError(w, r, err)
 					return
 				}
