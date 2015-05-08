@@ -15,6 +15,7 @@ var testAPI, testMux = func() (*API, *http.ServeMux) {
 	s := http.NewServeMux()
 	a := NewAPI()
 	a.Secret = []byte("wubalubadubdub!")
+	a.UserAuthGetParam = "_asUser"
 
 	s.Handle("/foo", a.WrapHandlerFunc(
 		NoAPITokenRequired,

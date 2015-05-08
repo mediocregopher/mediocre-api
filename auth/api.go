@@ -96,6 +96,15 @@ type API struct {
 	// any endpoints needing user authentication will return a 500 error.
 	// Defaults to nil
 	Secret []byte
+
+	// If set, when a user is successfully authenticated using their user token
+	// their username will be added onto the request itself under the GET
+	// request named by this field. Defaults to empty string (off).
+	//
+	// For example, if this was set to "asUser" then all requests which
+	// successfully authenticate a user will have "?asUser=<username>" appended
+	// to their URL before being forwarded down the handler chain.
+	UserAuthGetParam string
 }
 
 // NewAPI returns an API with all of its fields initialized to their default
@@ -216,9 +225,9 @@ func (ah *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		common.HTTPError(w, r, err)
 		return
 	}
-	if user != "" {
+	if user != "" && ah.api.UserAuthGetParam != "" {
 		values := r.URL.Query()
-		values.Add("_asUser", user)
+		values.Add(ah.api.UserAuthGetParam, user)
 		r.URL.RawQuery = values.Encode()
 	}
 

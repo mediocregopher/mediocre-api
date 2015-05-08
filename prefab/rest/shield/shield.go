@@ -35,6 +35,7 @@ func main() {
 func shieldMux(secret string) http.Handler {
 	a := auth.NewAPI()
 	a.Secret = []byte(secret)
+	a.UserAuthGetParam = "_asUser"
 
 	mux := http.NewServeMux()
 
