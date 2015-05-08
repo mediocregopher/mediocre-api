@@ -36,10 +36,10 @@ var (
 	}
 )
 
-// HMSETXXNX key fieldWhichExists fieldWhichDoesntExist field value [field
-// value...] Calls HMSET but only if fieldWhichExists is already set on the
-// hash, and fieldWhichDoesntExist isn't set. Returns 1 if set was successful, 0
-// if it failed due to the xx condition, or -1 if it filed due to the nx
+// HMSETXXNX key fieldWhichExists fieldWhichDoesntExist field value [field value...]
+// Calls HMSET but only if fieldWhichExists is already set on the hash, and
+// fieldWhichDoesntExist isn't set. Returns 1 if set was successful, 0 if it
+// failed due to the xx condition, or -1 if it filed due to the nx
 // condition
 var hmsetxxnx = `
 	if not redis.call('HGET', KEYS[1], ARGV[1]) then
@@ -63,6 +63,21 @@ var hmsetnx = `
 	end
 
 	redis.call('HMSET', KEYS[1], unpack(ARGV))
+	return 1
+`
+
+// HMSETDELNX key fieldWhichExists fieldToSet value field [field ...]
+// If fieldWhichExists does not exist on the key, returns 0
+// Otherwise sets fieldToSet to value, deletes the remaining listed fields, and
+// returns 1
+var hsetdelxx = `
+	if not redis.call('HGET', KEYS[1], ARGV[1]) then
+		return 0
+	end
+	redis.call('HSET', KEYS[1], ARGV[2], ARGV[3])
+	for i=4,#ARGV do
+		redis.call('HDEL', KEYS[1], ARGV[i])
+	end
 	return 1
 `
 
@@ -304,19 +319,34 @@ func (s *System) appendKeyvalsToArgs(
 	return args, nil
 }
 
+// Given a list of fields, unsets them on the user (assuming they all are valid
+// fields). This will also update TSModified, and will not work if the user
+// doesn't actually exist
 func (s *System) unset(user string, fields ...string) error {
 	if len(fields) == 0 {
 		return nil
 	}
-	keys := make([]string, len(fields))
-	for i, f := range fields {
-		keys[i] = s.fields[f].Key
-		if keys[i] == "" {
+
+	args := make([]interface{}, 0, len(fields)+4)
+	args = append(args, s.Key(user))
+	args = append(args, s.fields["Name"].Key)
+	args = append(args, s.fields["TSModified"].Key, marshalTime(time.Now()))
+
+	for _, f := range fields {
+		key := s.fields[f].Key
+		if key == "" {
 			return ErrFieldUnknown(f)
 		}
+		args = append(args, key)
 	}
 
-	return s.c.Cmd("HDEL", s.Key(user), keys).Err
+	i, err := util.LuaEval(s.c, hsetdelxx, 1, args...).Int()
+	if err != nil {
+		return err
+	} else if i == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Authenticate attempts to authenticate the user with the given password.
