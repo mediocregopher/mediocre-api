@@ -104,7 +104,7 @@ func TestInternalSetExists(t *T) {
 
 	user, _, _ := randUser(t, s)
 	start := time.Now()
-	err = s.set(user, "foo", "bar", "baz", "buz")
+	err = s.setExists(user, "foo", "bar", "baz", "buz")
 	require.Nil(t, err)
 	end := time.Now()
 
@@ -121,6 +121,25 @@ func TestInternalSetExists(t *T) {
 	assert.Equal(t, "buz", l[2])
 	assert.Equal(t, "", l[3])
 
+	// Make sure that disabling the user prevents setExists from working
+	require.Nil(t, s.Disable(user))
+	err = s.setExists(user, "foo", "bar1", "baz", "buz1")
+	assert.Equal(t, ErrDisabled, err)
+	l, err = s.c.Cmd("HMGET", s.Key(user), "foo", "baz", "box").List()
+	require.Nil(t, err)
+	assert.Equal(t, "bar", l[0])
+	assert.Equal(t, "buz", l[1])
+	assert.Equal(t, "", l[2])
+
+	// Make sure that re-enabling the user allows setExists to work again
+	require.Nil(t, s.Enable(user))
+	err = s.setExists(user, "foo", "bar1", "baz", "buz1")
+	require.Nil(t, err)
+	l, err = s.c.Cmd("HMGET", s.Key(user), "foo", "baz", "box").List()
+	require.Nil(t, err)
+	assert.Equal(t, "bar1", l[0])
+	assert.Equal(t, "buz1", l[1])
+	assert.Equal(t, "", l[2])
 }
 
 func TestAuthenticate(t *T) {

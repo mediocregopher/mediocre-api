@@ -36,14 +36,19 @@ var (
 	}
 )
 
-// HMSETXX key fieldWhichExists field value [field value...]
-// Calls HMSET but only if fieldWhichExists is already set on the hash. Returns
-// 1 if set was successful, 0 if it failed due to the xx condition
-var hmsetxx = `
+// HMSETXXNX key fieldWhichExists fieldWhichDoesntExist field value [field
+// value...] Calls HMSET but only if fieldWhichExists is already set on the
+// hash, and fieldWhichDoesntExist isn't set. Returns 1 if set was successful, 0
+// if it failed due to the xx condition, or -1 if it filed due to the nx
+// condition
+var hmsetxxnx = `
 	if not redis.call('HGET', KEYS[1], ARGV[1]) then
 		return 0
 	end
-	for i=2,#ARGV,2 do
+	if redis.call('HGET', KEYS[1], ARGV[2]) then
+		return -1
+	end
+	for i=3,#ARGV,2 do
 		redis.call('HSET', KEYS[1], ARGV[i], ARGV[i+1])
 	end
 	return 1
@@ -251,22 +256,25 @@ func (s *System) set(user string, keyvals ...interface{}) error {
 	return s.c.Cmd("HMSET", args...).Err
 }
 
-// same as set, but only if the user exists. Returns ErrNotFound if user doesn't
-// exist
+// same as set, but only if the user exists and is not disabled. Returns
+// ErrNotFound if user doesn't exist
 func (s *System) setExists(user string, keyvals ...interface{}) error {
-	args := make([]interface{}, 0, len(keyvals)+4)
+	args := make([]interface{}, 0, len(keyvals)+5)
 	args = append(args, s.Key(user))
 	args = append(args, s.fields["Name"].Key)
+	args = append(args, s.fields["Disabled"].Key)
 	args, err := s.appendKeyvalsToArgs(keyvals, args)
 	if err != nil {
 		return err
 	}
 
-	i, err := util.LuaEval(s.c, hmsetxx, 1, args...).Int()
+	i, err := util.LuaEval(s.c, hmsetxxnx, 1, args...).Int()
 	if err != nil {
 		return err
 	} else if i == 0 {
 		return ErrNotFound
+	} else if i == -1 {
+		return ErrDisabled
 	}
 	return nil
 }
