@@ -17,30 +17,27 @@ var testAPI, testMux = func() (*API, *http.ServeMux) {
 	a.Secret = []byte("wubalubadubdub!")
 	a.UserAuthGetParam = "_asUser"
 
-	s.Handle("/foo", a.WrapHandlerFunc(
-		NoAPITokenRequired,
-		func(w http.ResponseWriter, r *http.Request) {
+	s.Handle("/foo", a.Wrapper(NoAPITokenRequired)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "foo")
-		},
+		}),
 	))
 
-	s.Handle("/bar", a.WrapHandlerFunc(
-		Default,
-		func(w http.ResponseWriter, r *http.Request) {
+	s.Handle("/bar", a.Wrapper(Default)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "bar")
-		},
+		}),
 	))
 
-	s.Handle("/baz", a.WrapHandlerFunc(
-		RequireUserAuthPost,
-		func(w http.ResponseWriter, r *http.Request) {
+	s.Handle("/baz", a.Wrapper(RequireUserAuthPost)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == "POST" {
 				fmt.Fprintln(w, a.GetUser(r))
 				fmt.Fprintln(w, r.FormValue("_asUser"))
 			} else {
 				fmt.Fprintln(w, "baz")
 			}
-		},
+		}),
 	))
 
 	return a, s

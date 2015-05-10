@@ -155,93 +155,78 @@ func (a *API) GetUser(r *http.Request) string {
 	return usertok.ExtractUser(userTok, a.Secret)
 }
 
-type authHandler struct {
-	api     *API
-	handler http.Handler
-	flags   HandlerFlag
-}
+// Wrapper returns a function which takes in http.Handlers and wraps them,
+// returning a new http.Handler which will execute some logic based on the given
+// flags, calling the function's passed in http.Handler if everything checks out
+func (a *API) Wrapper(flags HandlerFlag) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// This could be the X-API-TOKEN or the IP, depending on flags If
+			// it's left empty we won't bother calling Use on it at the end of
+			// the query
+			var token string
 
-// WrapHandler returns an http.Handler which will process a request according to
-// the flags passed in, then, assuming all checks pass, passes the request on to
-// the given http.Handler
-func (a *API) WrapHandler(flags HandlerFlag, h http.Handler) http.Handler {
-	return &authHandler{
-		api:     a,
-		handler: h,
-		flags:   flags,
+			secret := a.Secret
+
+			if flags&IPRateLimited != 0 {
+				remoteIP := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
+				switch a.RateLimiter.CanUseRaw(remoteIP) {
+				case apitok.Success:
+					token = r.RemoteAddr
+				case apitok.RateLimited:
+					common.HTTPError(w, r, ErrIPAddrRateLimited)
+					return
+				default:
+					common.HTTPError(w, r, ErrUnknownProblem)
+					return
+				}
+
+				// We only rate limit by api token if we aren't rate limiting by ip
+			} else if flags&NoAPITokenRequired == 0 && secret != nil {
+				apiToken := a.GetAPIToken(r)
+				if apiToken == "" {
+					common.HTTPError(w, r, ErrAPITokenMissing)
+					return
+				}
+				switch a.RateLimiter.CanUse(apiToken, secret) {
+				case apitok.Success:
+					token = apiToken
+				case apitok.TokenInvalid:
+					common.HTTPError(w, r, ErrAPITokenInvalid)
+					return
+				case apitok.RateLimited:
+					common.HTTPError(w, r, ErrAPITokenRateLimited)
+					return
+				default:
+					common.HTTPError(w, r, ErrUnknownProblem)
+					return
+				}
+			}
+
+			user, err := a.authdUser(r)
+			if a.requiresUserAuth(flags, r) && err != nil {
+				common.HTTPError(w, r, err)
+				return
+			}
+			if user != "" && a.UserAuthGetParam != "" {
+				values := r.URL.Query()
+				values.Add(a.UserAuthGetParam, user)
+				r.URL.RawQuery = values.Encode()
+			}
+
+			start := time.Now()
+			h.ServeHTTP(w, r)
+
+			if token != "" {
+				elapsed := time.Since(start)
+				a.RateLimiter.Use(token, elapsed)
+			}
+		})
 	}
 }
 
-// WrapHandlerFunc is similar to WrapHandler except that it takes in a
-// HandlerFunc
-func (a *API) WrapHandlerFunc(flags HandlerFlag, hf http.HandlerFunc) http.Handler {
-	return a.WrapHandler(flags, hf)
-}
-
-func (ah *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// This could be the X-API-TOKEN or the IP, depending on flags If it's left
-	// empty we won't bother calling Use on it at the end of the query
-	var token string
-
-	secret := ah.api.Secret
-
-	if ah.flags&IPRateLimited != 0 {
-		remoteIP := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
-		switch ah.api.RateLimiter.CanUseRaw(remoteIP) {
-		case apitok.Success:
-			token = r.RemoteAddr
-		case apitok.RateLimited:
-			common.HTTPError(w, r, ErrIPAddrRateLimited)
-			return
-		default:
-			common.HTTPError(w, r, ErrUnknownProblem)
-			return
-		}
-
-		// We only rate limit by api token if we aren't rate limiting by ip
-	} else if ah.flags&NoAPITokenRequired == 0 && secret != nil {
-		apiToken := ah.api.GetAPIToken(r)
-		if apiToken == "" {
-			common.HTTPError(w, r, ErrAPITokenMissing)
-			return
-		}
-		switch ah.api.RateLimiter.CanUse(apiToken, secret) {
-		case apitok.Success:
-			token = apiToken
-		case apitok.TokenInvalid:
-			common.HTTPError(w, r, ErrAPITokenInvalid)
-			return
-		case apitok.RateLimited:
-			common.HTTPError(w, r, ErrAPITokenRateLimited)
-			return
-		default:
-			common.HTTPError(w, r, ErrUnknownProblem)
-			return
-		}
-	}
-
-	user, err := ah.authdUser(r)
-	if ah.requiresUserAuth(r) && err != nil {
-		common.HTTPError(w, r, err)
-		return
-	}
-	if user != "" && ah.api.UserAuthGetParam != "" {
-		values := r.URL.Query()
-		values.Add(ah.api.UserAuthGetParam, user)
-		r.URL.RawQuery = values.Encode()
-	}
-
-	start := time.Now()
-	ah.handler.ServeHTTP(w, r)
-
-	if token != "" {
-		elapsed := time.Since(start)
-		ah.api.RateLimiter.Use(token, elapsed)
-	}
-}
-
-func (ah *authHandler) authdUser(r *http.Request) (string, error) {
-	secret := ah.api.Secret
+func (a *API) authdUser(r *http.Request) (string, error) {
+	secret := a.Secret
 	if secret == nil {
 		return "", ErrSecretNotSet
 	}
@@ -259,8 +244,8 @@ func (ah *authHandler) authdUser(r *http.Request) (string, error) {
 	return user, nil
 }
 
-func (ah *authHandler) requiresUserAuth(r *http.Request) bool {
-	if ah.flags&RequireUserAuthAlways == RequireUserAuthAlways {
+func (a *API) requiresUserAuth(flags HandlerFlag, r *http.Request) bool {
+	if flags&RequireUserAuthAlways == RequireUserAuthAlways {
 		return true
 	}
 	var checkFlag HandlerFlag
@@ -279,5 +264,5 @@ func (ah *authHandler) requiresUserAuth(r *http.Request) bool {
 		return false
 	}
 
-	return ah.flags&checkFlag != 0
+	return flags&checkFlag != 0
 }

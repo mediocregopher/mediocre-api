@@ -71,44 +71,44 @@ func main() {
 	// token though. This endpoint will do just that. It will be rate limited
 	// based on ip instead of api token, and directly returns a new api token
 	// which can be used by the client
-	http.Handle("/new-api-token", a.WrapHandlerFunc(
-		auth.IPRateLimited,
-		func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/new-api-token", a.Wrapper(auth.IPRateLimited)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, a.NewAPIToken())
-		},
+		}),
 	))
+
+	// A single Wrapper can be used for multiple endpoints to make code more
+	// readable, and to better interface with packages like alice
+	authDefault := a.Wrapper(auth.Default)
 
 	// A normal request is, as mentioned before, rate-limited by api token,
 	// which must be set on the X-API-TOKEN header.
-	http.Handle("/echo", a.WrapHandlerFunc(
-		auth.Default,
-		func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/echo", authDefault(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			msg := r.FormValue("message")
 			fmt.Fprintln(w, msg)
-		},
+		}),
 	))
 
 	// In order to use user authenticated endpoints the user must retrieve a
 	// user token, and use that to authenticate their requests. The following
 	// lets a user login and retrieve their token
-	http.Handle("/login", a.WrapHandlerFunc(
-		auth.Default,
-		func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/login", authDefault(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			username := r.FormValue("username")
 			userTok := a.NewUserToken(username)
 			fmt.Fprintln(w, userTok)
-		},
+		}),
 	))
 
 	// This endpoint is only available to users who have logged in and properly
 	// send their user token (through X-USER-TOKEN). It retrieves their username
 	// that thay're logged in as and welcomes them to the site
-	http.Handle("/welcome", a.WrapHandlerFunc(
-		auth.RequireUserAuthAlways,
-		func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/welcome", a.Wrapper(auth.RequireUserAuthAlways)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			username := r.FormValue("_asUser")
 			fmt.Fprintf(w, "Welcome to the site, %s!", username)
-		},
+		}),
 	))
 
 	http.ListenAndServe(":8080", nil)

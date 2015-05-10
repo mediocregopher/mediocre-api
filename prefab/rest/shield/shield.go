@@ -39,12 +39,11 @@ func shieldMux(secret string) http.Handler {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/shield/token", a.WrapHandlerFunc(
-		auth.IPRateLimited,
-		func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/shield/token", a.Wrapper(auth.IPRateLimited)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := a.NewAPIToken()
 			apihelper.JSONSuccess(w, &struct{ Token string }{token})
-		},
+		}),
 	))
 
 	return mux
