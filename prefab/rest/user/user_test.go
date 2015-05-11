@@ -14,7 +14,7 @@ import (
 
 var testMux = func() http.Handler {
 	cmder := commontest.APIStarterKit()
-	return userMux(cmder)
+	return UserMux(cmder)
 }()
 
 func testAPICreateUser(t *T) (string, string, string) {

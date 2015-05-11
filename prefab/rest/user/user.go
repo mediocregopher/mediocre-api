@@ -78,7 +78,7 @@ func main() {
 	}
 
 	log.Printf("listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, userMux(cmder)))
+	log.Fatal(http.ListenAndServe(addr, UserMux(cmder)))
 }
 
 func requireAuthd(hf http.HandlerFunc) http.HandlerFunc {
@@ -92,7 +92,10 @@ func requireAuthd(hf http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func userMux(cmder util.Cmder) http.Handler {
+// UserMux takes in a util.Cmder and returns an http.Handler which impliments an
+// entire user system as a rest interface. See this package's README for more
+// information on REST endpoints
+func UserMux(cmder util.Cmder) http.Handler {
 	m := mux.NewRouter()
 	s := user.New(cmder)
 

@@ -71,6 +71,19 @@ func AssertReq(
 	assert.Equal(t, expectedBody, body, "\n%s", string(debug.Stack()))
 }
 
+// AssertReqRaw uses the stretchr/assert package to assert that the result of
+// executing the given *http.Request returns a 200 response code and the given
+// expectedBody
+func AssertReqRaw(
+	t *testing.T, mux http.Handler, r *http.Request, expectedBody string,
+) {
+	r.RemoteAddr = "1.1.1.1:50000"
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+	assert.Equal(t, 200, w.Code, "\n%s", string(debug.Stack()))
+	assert.Equal(t, expectedBody, w.Body.String(), "\n%s", string(debug.Stack()))
+}
+
 // AssertReqJSON uses the stretchr/assert package to assert that the result of
 // calling Req with the given arguments has a 200 response and a body which is
 // unmarshaled into dst successfully.
@@ -82,6 +95,20 @@ func AssertReqJSON(
 	assert.Equal(t, 200, code, "\n%s", string(debug.Stack()))
 
 	err := json.Unmarshal([]byte(body), dst)
+	require.Nil(t, err, "\n%s", string(debug.Stack()))
+}
+
+// AssertReqRawJSON uses the stretchr/assert package to assert that the result
+// of executing the given *http.Request returns a 200 response and a body which
+// is unmarshaled into dst successfully.
+func AssertReqRawJSON(
+	t *testing.T, mux http.Handler, r *http.Request, dst interface{},
+) {
+	r.RemoteAddr = "1.1.1.1:50000"
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+	assert.Equal(t, 200, w.Code, "\n%s", string(debug.Stack()))
+	err := json.Unmarshal([]byte(w.Body.String()), dst)
 	require.Nil(t, err, "\n%s", string(debug.Stack()))
 }
 

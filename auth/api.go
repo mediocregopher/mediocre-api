@@ -4,6 +4,7 @@
 package auth
 
 import (
+	"bytes"
 	"net/http"
 	"strings"
 	"time"
@@ -265,4 +266,18 @@ func (a *API) requiresUserAuth(flags HandlerFlag, r *http.Request) bool {
 	}
 
 	return flags&checkFlag != 0
+}
+
+// NewRequest returns an *http.Request which will have the appropriate headers
+// needed for interacting with an endpoint wrapped by the API. The api token
+// generated will be different for every request. If user is non-empty a user
+// token for that user will be generated and filled in as well. This funtion is
+// primarily useful for testing.
+func (a *API) NewRequest(method, endpnt, body, user string) *http.Request {
+	r, _ := http.NewRequest(method, endpnt, bytes.NewBufferString(body))
+	r.Header.Set(APITokenHeader, a.NewAPIToken())
+	if user != "" {
+		r.Header.Set(UserTokenHeader, a.NewUserToken(user))
+	}
+	return r
 }
