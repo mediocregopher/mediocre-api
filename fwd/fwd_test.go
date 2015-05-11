@@ -13,7 +13,11 @@ import (
 
 var testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Method", r.Method)
-	w.Header().Set("X-Path", r.URL.Path)
+	xpath := r.URL.Path
+	if r.URL.RawQuery != "" {
+		xpath += "?" + r.URL.RawQuery
+	}
+	w.Header().Set("X-Path", xpath)
 	w.Header().Set("X-Whatever", "foo")
 	io.Copy(w, r.Body)
 })
@@ -74,6 +78,19 @@ func TestRel(t *T) {
 
 	assert.Equal(t, []string{"GET"}, w.HeaderMap["X-Method"])
 	assert.Equal(t, []string{"/rel/somepath"}, w.HeaderMap["X-Path"])
+	assert.Equal(t, []string{"bar", "foo"}, w.HeaderMap["X-Whatever"])
+	assert.Equal(t, "OHAI", w.Body.String())
+
+	// Make sure the request gets its GET arguments passed along
+	body = bytes.NewBufferString("OHAI")
+	req, err = http.NewRequest("GET", "http://example.com/somepath?foo=bar", body)
+	assert.Nil(t, err)
+
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	assert.Equal(t, []string{"GET"}, w.HeaderMap["X-Method"])
+	assert.Equal(t, []string{"/rel/somepath?foo=bar"}, w.HeaderMap["X-Path"])
 	assert.Equal(t, []string{"bar", "foo"}, w.HeaderMap["X-Whatever"])
 	assert.Equal(t, "OHAI", w.Body.String())
 }

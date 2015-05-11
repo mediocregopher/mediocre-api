@@ -56,6 +56,7 @@ func Rel(
 		if err != nil {
 			errHandler(r, err)
 		}
+		parsedURL.RawQuery = r.URL.RawQuery
 
 		doProxy(parsedURL, w, r, errHandler)
 	})
