@@ -37,49 +37,40 @@ func ipIsPrivate(ip net.IP) bool {
 	return false
 }
 
-// XFF implements the https.Handler interface. It will parse X-Forwarded-For
-// headers in any request it sees, fixing the RemoteAddr accordingly, and then
-// pass off the request to the handler it was initialized with
-type XFF struct {
-	h http.Handler
-}
-
-// NewXFF intializes an XFF which can be then passed off to anything which
-// acceps an http.Handler, such as http.ListenAndServe
-func NewXFF(h http.Handler) *XFF {
-	return &XFF{h}
-}
-
-// ServeHTTP implements the http.Handler interface
-func (x *XFF) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer x.h.ServeHTTP(w, r)
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff == "" {
-		return
-	}
-
-	ips := strings.Split(xff, ",")
-	finalIP := ""
-	for i := range ips {
-		ip := parseIP(ips[i])
-		if ip == nil || ip.IsLoopback() || ipIsPrivate(ip) {
-			continue
+// XFF takes in an http.Handler and wraps it in a new http.Handler which will
+// deal with X-Forwarded-For headers, correctly changing RemoteAddr where
+// appropriate, before passing the request off to the passed in http.Handler.
+func XFF(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer h.ServeHTTP(w, r)
+		xff := r.Header.Get("X-Forwarded-For")
+		if xff == "" {
+			return
 		}
-		finalIP = ip.String()
-		break
-	}
 
-	if finalIP == "" {
-		return
-	}
-	finalNeedsBrackets := (strings.Index(finalIP, ":") >= 0)
+		ips := strings.Split(xff, ",")
+		finalIP := ""
+		for i := range ips {
+			ip := parseIP(ips[i])
+			if ip == nil || ip.IsLoopback() || ipIsPrivate(ip) {
+				continue
+			}
+			finalIP = ip.String()
+			break
+		}
 
-	port := r.RemoteAddr[strings.LastIndex(r.RemoteAddr, ":")+1:]
-	if finalNeedsBrackets {
-		r.RemoteAddr = "[" + finalIP + "]:" + port
-	} else {
-		r.RemoteAddr = finalIP + ":" + port
-	}
+		if finalIP == "" {
+			return
+		}
+		finalNeedsBrackets := (strings.Index(finalIP, ":") >= 0)
+
+		port := r.RemoteAddr[strings.LastIndex(r.RemoteAddr, ":")+1:]
+		if finalNeedsBrackets {
+			r.RemoteAddr = "[" + finalIP + "]:" + port
+		} else {
+			r.RemoteAddr = finalIP + ":" + port
+		}
+	})
 }
 
 // Used because we may want to strip the brackets from an input ip, if there are

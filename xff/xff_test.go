@@ -15,7 +15,7 @@ func echoRemoteAddr(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, r.RemoteAddr)
 }
 
-var testXFF = NewXFF(http.HandlerFunc(echoRemoteAddr))
+var testXFF = XFF(http.HandlerFunc(echoRemoteAddr))
 
 func testAddr(t *T, addrExpect, addrIn string, forwards ...string) {
 	r, err := http.NewRequest("GET", "/", nil)
