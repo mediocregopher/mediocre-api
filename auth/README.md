@@ -17,7 +17,7 @@ A simple http middleware. It provides:
 ## API Token
 
 The api token is the basis of rate-limiting in most cases. All requests by
-default require an api key to be set on the header `X-API-TOKEN`, which must be
+default require an api key to be set in the cookie `API_TOKEN`, which must be
 retrieved from the api itself.
 
 **API tokens are only valid for 3 hours. The application must expect this and
@@ -42,7 +42,7 @@ Any modifications to rate limiting fields must be done before the call to
 User authentication is based upon a simple user token system. A client retrieves
 a user token from the api, which authenticates the user however it wants and
 returns a token generated through `NewUserToken`. This token must be included
-with any requests that require user authentication as the `X-USER-TOKEN` header.
+with any requests that require user authentication as the `USER_TOKEN` cookie.
 The api may retrieve the authenticated user identifier using `GetUser`.
 
 ## Example
@@ -82,7 +82,7 @@ func main() {
 	authDefault := a.Wrapper(auth.Default)
 
 	// A normal request is, as mentioned before, rate-limited by api token,
-	// which must be set on the X-API-TOKEN header.
+	// which must be set on the API_TOKEN cookie.
 	http.Handle("/echo", authDefault(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			msg := r.FormValue("message")

@@ -52,10 +52,10 @@ func req(
 	require.Nil(t, err)
 	r.RemoteAddr = "1.1.1.1:50000"
 	if apiTok != "" {
-		r.Header.Set(APITokenHeader, apiTok)
+		r.AddCookie(&http.Cookie{Name: APITokenCookie, Value: apiTok})
 	}
 	if userTok != "" {
-		r.Header.Set(UserTokenHeader, userTok)
+		r.AddCookie(&http.Cookie{Name: UserTokenCookie, Value: userTok})
 	}
 	w := httptest.NewRecorder()
 	api.ServeHTTP(w, r)

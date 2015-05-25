@@ -27,10 +27,10 @@ var (
 	ErrUnknownProblem      = common.ExpectedErr{Code: 500, Err: "unknown problem"}
 )
 
-// Various http headers which this package will look for
+// Various cookies which this package will look for
 const (
-	APITokenHeader  = "X-API-TOKEN"
-	UserTokenHeader = "X-USER-TOKEN"
+	APITokenCookie  = "X-API-TOKEN"
+	UserTokenCookie = "X-USER-TOKEN"
 )
 
 // HandlerFlag is used to set options on a particular handler
@@ -129,7 +129,11 @@ func (a *API) NewAPIToken() string {
 // GetAPIToken returns the api token as sent by the client. Will return empty
 // string if the client has not set one
 func (a *API) GetAPIToken(r *http.Request) string {
-	return r.Header.Get(APITokenHeader)
+	c, err := r.Cookie(APITokenCookie)
+	if err != nil {
+		return ""
+	}
+	return c.Value
 }
 
 // NewUserToken generates a new user token for the given user identifier (which
@@ -143,17 +147,17 @@ func (a *API) NewUserToken(user string) string {
 }
 
 // GetUser returns the user identifier held by the user token from the given
-// request. Returns empty string if the user token header isn't set or invalid,
+// request. Returns empty string if the user token cookie isn't set or invalid,
 // or if Secret isn't set
 func (a *API) GetUser(r *http.Request) string {
 	if a.Secret == nil {
 		return ""
 	}
-	userTok := r.Header.Get(UserTokenHeader)
-	if userTok == "" {
+	c, err := r.Cookie(UserTokenCookie)
+	if err != nil || c.Value == "" {
 		return ""
 	}
-	return usertok.ExtractUser(userTok, a.Secret)
+	return usertok.ExtractUser(c.Value, a.Secret)
 }
 
 // Wrapper returns a function which takes in http.Handlers and wraps them,
@@ -232,12 +236,12 @@ func (a *API) authdUser(r *http.Request) (string, error) {
 		return "", ErrSecretNotSet
 	}
 
-	userTok := r.Header.Get(UserTokenHeader)
-	if userTok == "" {
+	c, err := r.Cookie(UserTokenCookie)
+	if err != nil || c.Value == "" {
 		return "", ErrUserTokenMissing
 	}
 
-	user := usertok.ExtractUser(userTok, secret)
+	user := usertok.ExtractUser(c.Value, secret)
 	if user == "" {
 		return "", ErrUserTokenInvalid
 	}
@@ -268,16 +272,22 @@ func (a *API) requiresUserAuth(flags HandlerFlag, r *http.Request) bool {
 	return flags&checkFlag != 0
 }
 
-// NewRequest returns an *http.Request which will have the appropriate headers
+// NewRequest returns an *http.Request which will have the appropriate cookies
 // needed for interacting with an endpoint wrapped by the API. The api token
 // generated will be different for every request. If user is non-empty a user
 // token for that user will be generated and filled in as well. This funtion is
 // primarily useful for testing.
 func (a *API) NewRequest(method, endpnt, body, user string) *http.Request {
 	r, _ := http.NewRequest(method, endpnt, bytes.NewBufferString(body))
-	r.Header.Set(APITokenHeader, a.NewAPIToken())
+	r.AddCookie(&http.Cookie{
+		Name:  APITokenCookie,
+		Value: a.NewAPIToken(),
+	})
 	if user != "" {
-		r.Header.Set(UserTokenHeader, a.NewUserToken(user))
+		r.AddCookie(&http.Cookie{
+			Name:  UserTokenCookie,
+			Value: a.NewUserToken(user),
+		})
 	}
 	return r
 }
