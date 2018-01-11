@@ -1,7 +1,6 @@
 # mediocre-api
 
-**THIS PROJECT IS STILL A WORK IN PROGRESS, AND THE API IS LIKELY TO CHANGE A
-LOT FOR A WHILE**
+**This package is no longer maintained**
 
 This is a collection of packages, each independent of the other, but which
 together can be used to form the skeleton of an api. It is presumed to be backed
